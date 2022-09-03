@@ -1,0 +1,17 @@
+.dub
+docs.json
+__dummy.html
+docs/
+/thepath
+/build
+thepath.so
+thepath.dylib
+thepath.dll
+thepath.a
+thepath.lib
+thepath-test-*
+*.exe
+*.o
+*.obj
+*.lst
+*.sw[pno]
