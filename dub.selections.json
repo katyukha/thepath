@@ -1,0 +1,8 @@
+{
+	"fileVersion": 1,
+	"versions": {
+		"dshould": "1.7.0",
+		"prettyprint": "1.0.8",
+		"unit-threaded": "2.1.2"
+	}
+}

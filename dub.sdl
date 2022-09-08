@@ -5,3 +5,10 @@ copyright "Copyright © 2022, Dmytro Katyukha"
 license "MPL-2.0"
 targetPath "./build/"
 targetType "library"
+
+configuration "library" {
+}
+
+configuration "unittest" {
+    dependency "dshould" version="~>1.7.0"
+}
