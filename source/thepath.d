@@ -44,6 +44,10 @@ private string createTempDirectory(string path, string prefix="tmp") {
     }
 }
 
+private Path createTempPath(string prefix="tmp") {
+    return Path(createTempDirectory(prefix));
+}
+
 
 
 class PathException : Exception {
@@ -122,6 +126,19 @@ struct Path {
         return this.join(args);
     }
 
+    unittest {
+        import dshould;
+        string tmp_dir = createTempDirectory();
+        scope(exit) std.file.rmdirRecurse(tmp_dir);
+
+        Path root = Path(tmp_dir);
+        auto test_c_file = root.join("test-create.txt");
+        root._path.should.equal(tmp_dir);
+        test_c_file._path.should.equal(tmp_dir ~ std.path.dirSeparator ~"test-create.txt");
+        test_c_file.isAbsolute.should.be(true);
+    }
+
+
     Path parent() const {
         if (isAbsolute()) {
             return Path(std.path.dirName(_path));
@@ -194,10 +211,6 @@ struct Path {
     }
 
     void copyFileTo(in Path dest, in bool rewrite=false) const {
-        debug {
-            import std.stdio;
-            writeln("Copying %s to %s".format(_path, dest._path));
-        }
         enforce!PathException(
             this.exists,
             "Cannot Copy! Source file %s does not exists!".format(_path));
@@ -243,20 +256,189 @@ struct Path {
         }
     }
 
-    void remove(in bool recursive=false) const {
+    unittest {
+        import dshould;
+        Path root = createTempPath();
+        scope(exit) root.remove();
+
+        auto test_c_file = root.join("test-create.txt");
+
+        // Create test file to copy
+        test_c_file.exists.should.be(false);
+        test_c_file.writeFile("Hello World");
+        test_c_file.exists.should.be(true);
+
+        // Test copy file when dest dir does not exists
+        test_c_file.copyTo(
+            root.join("test-copy-dst", "test.txt")
+        ).should.throwA!(std.file.FileException);
+
+        // Test copy file where dest dir exists and dest name specified
+        root.join("test-copy-dst").exists().should.be(false);
+        root.join("test-copy-dst").mkdir();
+        root.join("test-copy-dst").exists().should.be(true);
+        root.join("test-copy-dst", "test.txt").exists.should.be(false);
+        test_c_file.copyTo(root.join("test-copy-dst", "test.txt"));
+        root.join("test-copy-dst", "test.txt").exists.should.be(true);
+
+        // Try to copy file when it is already exists in dest folder
+        test_c_file.copyTo(
+            root.join("test-copy-dst", "test.txt")
+        ).should.throwA!PathException;
+
+        // Try to copy file, when only dirname specified
+        root.join("test-copy-dst", "test-create.txt").exists.should.be(false);
+        test_c_file.copyTo(root.join("test-copy-dst"));
+        root.join("test-copy-dst", "test-create.txt").exists.should.be(true);
+    }
+
+
+
+    void remove() const {
         if (isFile) std.file.remove(_path);
-        else if (recursive) std.file.rmdirRecurse(_path);
-        else std.file.rmdir(_path);
+        else std.file.rmdirRecurse(_path);
+    }
+
+    unittest {
+        import dshould;
+        Path root = createTempPath();
+        scope(exit) root.remove();
+
+        // Try to remove file
+        root.join("test-file.txt").exists.should.be(false);
+        root.join("test-file.txt").writeFile("test");
+        root.join("test-file.txt").exists.should.be(true);
+        root.join("test-file.txt").remove();
+        root.join("test-file.txt").exists.should.be(false);
+
+        // Create test dir with contents
+        root.join("test-dir").mkdir();
+        root.join("test-dir", "f1.txt").writeFile("f1");
+        root.join("test-dir", "d2").mkdir();
+        root.join("test-dir", "d2", "f2.txt").writeFile("f2");
+
+        // Ensure test dir with contents created
+        root.join("test-dir").exists.should.be(true);
+        root.join("test-dir").isDir.should.be(true);
+        root.join("test-dir", "f1.txt").exists.should.be(true);
+        root.join("test-dir", "f1.txt").isFile.should.be(true);
+        root.join("test-dir", "d2").exists.should.be(true);
+        root.join("test-dir", "d2").isDir.should.be(true);
+        root.join("test-dir", "d2", "f2.txt").exists.should.be(true);
+        root.join("test-dir", "d2", "f2.txt").isFile.should.be(true);
+
+        // Remove test directory
+        root.join("test-dir").remove();
+
+        // Ensure directory was removed
+        root.join("test-dir").exists.should.be(false);
+        root.join("test-dir", "f1.txt").exists.should.be(false);
+        root.join("test-dir", "d2").exists.should.be(false);
+        root.join("test-dir", "d2", "f2.txt").exists.should.be(false);
     }
 
     void rename(in Path to) const {
         return std.file.rename(_path, to._path);
     }
 
+    void rename(in string to) const {
+        return rename(Path(to));
+    }
+
+    unittest {
+        import dshould;
+        Path root = createTempPath();
+        scope(exit) root.remove();
+
+        // Create file
+        root.join("test-file.txt").exists.should.be(false);
+        root.join("test-file-new.txt").exists.should.be(false);
+        root.join("test-file.txt").writeFile("test");
+        root.join("test-file.txt").exists.should.be(true);
+        root.join("test-file-new.txt").exists.should.be(false);
+
+        // Rename file
+        root.join("test-file.txt").exists.should.be(true);
+        root.join("test-file-new.txt").exists.should.be(false);
+        root.join("test-file.txt").rename(root.join("test-file-new.txt"));
+        root.join("test-file.txt").exists.should.be(false);
+        root.join("test-file-new.txt").exists.should.be(true);
+
+        // Create test dir with contents
+        root.join("test-dir").mkdir();
+        root.join("test-dir", "f1.txt").writeFile("f1");
+        root.join("test-dir", "d2").mkdir();
+        root.join("test-dir", "d2", "f2.txt").writeFile("f2");
+
+        // Ensure test dir with contents created
+        root.join("test-dir").exists.should.be(true);
+        root.join("test-dir").isDir.should.be(true);
+        root.join("test-dir", "f1.txt").exists.should.be(true);
+        root.join("test-dir", "f1.txt").isFile.should.be(true);
+        root.join("test-dir", "d2").exists.should.be(true);
+        root.join("test-dir", "d2").isDir.should.be(true);
+        root.join("test-dir", "d2", "f2.txt").exists.should.be(true);
+        root.join("test-dir", "d2", "f2.txt").isFile.should.be(true);
+
+        // Try to rename directory
+        root.join("test-dir").rename(root.join("test-dir-new"));
+
+        // Ensure old dir does not exists anymore
+        root.join("test-dir").exists.should.be(false);
+        root.join("test-dir", "f1.txt").exists.should.be(false);
+        root.join("test-dir", "d2").exists.should.be(false);
+        root.join("test-dir", "d2", "f2.txt").exists.should.be(false);
+
+        // Ensure test dir was renamed successfully
+        root.join("test-dir-new").exists.should.be(true);
+        root.join("test-dir-new").isDir.should.be(true);
+        root.join("test-dir-new", "f1.txt").exists.should.be(true);
+        root.join("test-dir-new", "f1.txt").isFile.should.be(true);
+        root.join("test-dir-new", "d2").exists.should.be(true);
+        root.join("test-dir-new", "d2").isDir.should.be(true);
+        root.join("test-dir-new", "d2", "f2.txt").exists.should.be(true);
+        root.join("test-dir-new", "d2", "f2.txt").isFile.should.be(true);
+    }
+
     void mkdir(in bool recursive=false) const {
         if (recursive) std.file.mkdirRecurse(_path);
         else std.file.mkdir(_path);
     }
+
+    unittest {
+        import dshould;
+        Path root = createTempPath();
+        scope(exit) root.remove();
+
+        root.join("test-dir").exists.should.be(false);
+        root.join("test-dir", "subdir").exists.should.be(false);
+
+        root.join("test-dir", "subdir").mkdir().should.throwA!(std.file.FileException);
+
+        root.join("test-dir").mkdir();
+        root.join("test-dir").exists.should.be(true);
+        root.join("test-dir", "subdir").exists.should.be(false);
+
+        root.join("test-dir", "subdir").mkdir();
+
+        root.join("test-dir").exists.should.be(true);
+        root.join("test-dir", "subdir").exists.should.be(true);
+    }
+
+    unittest {
+        import dshould;
+        Path root = createTempPath();
+        scope(exit) root.remove();
+
+        root.join("test-dir").exists.should.be(false);
+        root.join("test-dir", "subdir").exists.should.be(false);
+
+        root.join("test-dir", "subdir").mkdir(true);
+
+        root.join("test-dir").exists.should.be(true);
+        root.join("test-dir", "subdir").exists.should.be(true);
+    }
+
 
     auto openFile(in string openMode = "rb") const {
         static import std.stdio;
@@ -278,29 +460,23 @@ struct Path {
 
     unittest {
         import dshould;
-        string tmp_dir = createTempDirectory();
-        scope(exit) std.file.rmdirRecurse(tmp_dir);
+        Path root = createTempPath();
+        scope(exit) root.remove();
 
-        version (Posix) {
-            auto root = Path(tmp_dir);
-            auto test_c_file = root.join("test-create.txt");
-            root._path.should.equal(tmp_dir);
-            test_c_file._path.should.equal(tmp_dir ~ "/test-create.txt");
-            test_c_file.exists.should.be(false);
-            test_c_file.isAbsolute.should.be(true);
+        auto test_c_file = root.join("test-create.txt");
+        test_c_file.exists.should.be(false);
 
-            // Test file read/write
-            test_c_file.writeFile("Hello World");
-            test_c_file.exists.should.be(true);
-            test_c_file.readFile.should.equal("Hello World");
-            test_c_file.appendFile("!");
-            test_c_file.readFile.should.equal("Hello World!");
+        // Test file read/write
+        test_c_file.writeFile("Hello World");
+        test_c_file.exists.should.be(true);
+        test_c_file.readFile.should.equal("Hello World");
+        test_c_file.appendFile("!");
+        test_c_file.readFile.should.equal("Hello World!");
 
-            // Test copy file
-            auto dst_dir = root.join("test-copy-dst", "test.txt");
-            test_c_file.copyTo(dst_dir).should.throwA!PathException;
-            
-        }
+        // Try to remove file
+        test_c_file.exists.should.be(true);
+        test_c_file.remove();
+        test_c_file.exists.should.be(false);
     }
 
 
