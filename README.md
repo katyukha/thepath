@@ -11,6 +11,7 @@ Following principles used in this project
 - Any operation on path have to produce new instance of `Path`
   to avoid side effects
 - Simplify naming for frequent operations (introducing new type for this allows to do it).
+- Automatic tilde expansion when needed (for example before file operations);
 
 
 ## Examples
