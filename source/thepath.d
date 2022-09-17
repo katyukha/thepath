@@ -1,8 +1,10 @@
+/// ThePath - easy way to work with paths and files
 module thepath;
 
 static public import std.file: SpanMode;
 static private import std.path;
 static private import std.file;
+static private import std.stdio;
 private import std.path: expandTilde;
 private import std.format: format;
 private import std.exception: enforce;
@@ -66,46 +68,90 @@ class PathException : Exception {
     }
 }
 
+/// Determines the way to copy file/dir
 enum CopyMode {
+
+    /** The standard copy.
+     *  In case of copying directory, it will be copied recursively.
+     *  If destination path already exists and it is directory, then
+     *  source will be copied inside that direcotry with same basename.
+     *  If destination path already exists and it is not directory, then
+     *  error will be raised.
+     **/
     Standard,
 }
 
+
+/** Main struct to work with paths.
+  **/
 struct Path {
     // TODO: Deside if we need to make _path by default configured to current directory or to allow path to be null
     private string _path=".";
 
+    /** Main constructor to build new Path from string
+      * Params:
+      *    path = string representation of path to point to
+      **/
     this(in string path) {
         _path = path;
     }
 
+    /** Constructor that allows to build path from segments
+      * Params:
+      *     segments = array of segments to build path from
+     **/
+    this(in string[] segments...) {
+        _path = std.path.buildNormalizedPath(segments);
+    }
+
+    ///
+    unittest {
+        import dshould;
+
+        version(Posix) {
+            Path("foo", "moo", "boo").toString.should.equal("foo/moo/boo");
+            Path("/foo/moo", "boo").toString.should.equal("/foo/moo/boo");
+        }
+    }
+
+    /** Check if path is valid.
+      * Returns: true if this is valid path.
+      **/
     bool isValid() const {
         return std.path.isValidPath(_path);
     }
 
+    /// Check if path is absolute
     bool isAbsolute() const {
         return std.path.isAbsolute(_path);
     }
 
+    /// Check if path starts at root directory (or drive letter)
     bool isRooted() const {
         return std.path.isRooted(_path);
     }
 
+    /// Determine if path is file.
     bool isFile() const {
         return std.file.isFile(_path.expandTilde);
     }
 
+    // Determine if path is directory.
     bool isDir() const {
         return std.file.isDir(_path.expandTilde);
     }
 
+    // Determine if path is symlink
     bool isSymlink() const {
         return std.file.isSymlink(_path.expandTilde);
     }
 
+    // Check if path exists
     bool exists() const {
         return std.file.exists(_path.expandTilde);
     }
 
+    ///
     unittest {
         import dshould;
 
@@ -127,16 +173,25 @@ struct Path {
         }
     }
 
+    /// Return path as string
     string toString() const {
         return _path;
     }
 
+
+    /** Convert path to absolute path.
+      * Returns: new instance of Path that represents current path converted to
+      *          absolute path.
+      *          Also, this method will automatically do tilde expansion and
+      *          normalization of path.
+      **/
     Path toAbsolute() const {
         return Path(
             std.path.buildNormalizedPath(
                 std.path.absolutePath(_path.expandTilde)));
     }
 
+    ///
     unittest {
         import dshould;
 
@@ -156,10 +211,16 @@ struct Path {
         }
     }
 
+    /** Expand tilde (~) in current path.
+      * Returns: New path with tilde expaded
+      **/
     Path expandTilde() const {
         return Path(std.path.expandTilde(_path));
     }
 
+    /** Normalize path.
+      * Returns: new normalized Path.
+      **/
     Path normalize() const {
         import std.array : array;
         import std.exception : assumeUnique;
@@ -167,6 +228,7 @@ struct Path {
         return Path(assumeUnique(result.array));
     }
 
+    ///
     unittest {
         import dshould;
 
@@ -177,18 +239,26 @@ struct Path {
         }
     }
 
+    /** Join multiple path segments and return single path.
+      * Params:
+      *     segments = Array of strings (or Path) to build new path..
+      * Returns:
+      *     New path build from current path and provided segments
+      **/
     Path join(in string[] segments...) const {
         string[] args=[cast(string)_path];
         foreach(s; segments) args ~= s;
         return Path(std.path.buildPath(args));
     }
 
+    /// ditto
     Path join(in Path[] segments...) const {
         string[] args=[];
         foreach(p; segments) args ~= p.toString();
         return this.join(args);
     }
 
+    ///
     unittest {
         import dshould;
         string tmp_dir = createTempDirectory();
@@ -212,6 +282,10 @@ struct Path {
     }
 
 
+    /** determine parent path of this path
+      * Returns:
+      *     Absolute Path to parent directory.
+      **/
     Path parent() const {
         if (isAbsolute()) {
             return Path(std.path.dirName(_path));
@@ -220,6 +294,7 @@ struct Path {
         }
     }
 
+    ///
     unittest {
         import dshould;
         version(Posix) {
@@ -244,6 +319,15 @@ struct Path {
         }
     }
 
+    /** Return this path as relative to base
+      * Params:
+      *     base = base path to make this path relative to. Must be absolute.
+      * Returns:
+      *     new Path that is relative to base but represent same location
+      *     as this path.
+      * Throws:
+      *     PathException if base path is not valid or not absolute
+      **/
     Path relativeTo(in Path base) const {
         enforce!PathException(
             base.isValid && base.isAbsolute,
@@ -251,10 +335,12 @@ struct Path {
         return Path(std.path.relativePath(_path, base._path));
     }
 
+    /// ditto
     Path relativeTo(in string base) const {
         return relativeTo(Path(base));
     }
 
+    ///
     unittest {
         import dshould;
         Path("foo").relativeTo(std.file.getcwd).toString().should.equal("foo");
@@ -274,22 +360,30 @@ struct Path {
         }
     }
 
+    /// Returns extension for current path
     string extension() const {
         return std.path.extension(_path);
     }
 
+    /// Returns base name of current path
     string baseName() const {
         return std.path.baseName(_path);
     }
 
-    string dirName() const {
-        return std.path.dirName(_path);
+    ///
+    unittest {
+        import dshould;
+        Path("foo").baseName.should.equal("foo");
+        Path("foo", "moo").baseName.should.equal("moo");
+        Path("foo", "moo", "test.txt").baseName.should.equal("test.txt");
     }
 
+    /// Return size of file specified by path
     ulong getSize() const {
         return std.file.getSize(_path.expandTilde);
     }
 
+    ///
     unittest {
         import dshould;
         Path root = createTempPath();
@@ -310,6 +404,10 @@ struct Path {
         }
     }
 
+    /** Resolve link and return real path.
+      * Available only for posix systems.
+      * If path is not symlink, then return it unchanged
+      **/
     version(Posix) Path readLink() const {
         if (isSymlink()) {
             return Path(std.file.readLink(_path.expandTilde));
@@ -318,6 +416,19 @@ struct Path {
         }
     }
 
+    /** Iterate over all files and directories inside path;
+      *
+      * Params:
+      *     mode = The way to traverse directories. See [docs](https://dlang.org/phobos/std_file.html#SpanMode)
+      *     followSymlink = do we need to follow symlinks of not. By default set to True.
+      *
+      * Examples:
+      * ---
+      * // Iterate over paths in current directory
+      * foreach (Path p; Path(".").walk(SpanMode.breadth)) {
+      *     if (p.isFile) writeln(p);
+      * ---
+      **/
     auto walk(SpanMode mode=SpanMode.shallow, bool followSymlink=true) const {
         import std.algorithm.iteration: map;
         return std.file.dirEntries(
@@ -325,10 +436,12 @@ struct Path {
 
     }
 
+    /// Change current working directory to this.
     void chdir() const {
         std.file.chdir(_path.expandTilde);
     }
 
+    ///
     unittest {
         import dshould;
         auto cdir = std.file.getcwd;
@@ -348,18 +461,37 @@ struct Path {
             scope(exit) home_tmp.remove();
             string tmp_dir_name = home_tmp.baseName;
             std.file.getcwd.should.not.equal(home_tmp._path);
-            Path("~/%s".format(tmp_dir_name)).chdir;
+
+            // Change current working directory to tmp-dir-name
+            Path("~", tmp_dir_name).chdir;
             std.file.getcwd.should.equal(home_tmp._path);
         }
     }
 
+    /** Copy single file to destination.
+      * If destination does not exists,
+      * then file will be copied exactly to that path.
+      * If destination already exists and it is directory, then method will
+      * try to copy file inside that directory with same name.
+      * If destination already exists and it is file,
+      * then depending on `rewrite` param file will be owerwritten or
+      * PathException will be thrown.
+      * Params:
+      *     dest = destination path to copy file to. Could be new file path,
+      *            or directory where to copy file.
+      *     rewrite = do we need to rewrite file if it already exists?
+      * Throws:
+      *     PathException if source file does not exists or
+      *                   if destination already exists and
+      *                   it is not a directory and rewrite is set to false.
+      **/
     void copyFileTo(in Path dest, in bool rewrite=false) const {
         enforce!PathException(
             this.exists,
             "Cannot Copy! Source file %s does not exists!".format(_path));
         if (dest.exists) {
             if (dest.isDir) {
-                this.copyFileTo(dest.join(this.baseName));
+                this.copyFileTo(dest.join(this.baseName), rewrite);
             } else if (!rewrite) {
                 throw new PathException(
                         "Cannot copy! Destination file %s already exists!".format(dest._path));
@@ -371,15 +503,74 @@ struct Path {
         }
     }
 
+    ///
+    unittest {
+        import dshould;
+
+        // Prepare temporary path for test
+        auto cdir = std.file.getcwd;
+        Path root = createTempPath();
+        scope(exit) {
+            std.file.chdir(cdir);
+            root.remove();
+        }
+
+        // Create test directory structure
+        root.join("test-file.txt").writeFile("test");
+        root.join("test-file-2.txt").writeFile("test-2");
+        root.join("test-dst-dir").mkdir;
+
+        // Test copy file by path
+        root.join("test-dst-dir", "test1.txt").exists.should.be(false);
+        root.join("test-file.txt").copyFileTo(root.join("test-dst-dir", "test1.txt"));
+        root.join("test-dst-dir", "test1.txt").exists.should.be(true);
+
+        // Test copy file by path with rewrite
+        root.join("test-dst-dir", "test1.txt").readFile.should.equal("test");
+        root.join("test-file-2.txt").copyFileTo(root.join("test-dst-dir", "test1.txt")).should.throwA!PathException;
+        root.join("test-file-2.txt").copyFileTo(root.join("test-dst-dir", "test1.txt"), true);
+        root.join("test-dst-dir", "test1.txt").readFile.should.equal("test-2");
+
+        // Test copy file inside dir
+        root.join("test-dst-dir", "test-file.txt").exists.should.be(false);
+        root.join("test-file.txt").copyFileTo(root.join("test-dst-dir"));
+        root.join("test-dst-dir", "test-file.txt").exists.should.be(true);
+
+        // Test copy file inside dir with rewrite
+        root.join("test-file.txt").writeFile("test-42");
+        root.join("test-dst-dir", "test-file.txt").readFile.should.equal("test");
+        root.join("test-file.txt").copyFileTo(root.join("test-dst-dir")).should.throwA!PathException;
+        root.join("test-file.txt").copyFileTo(root.join("test-dst-dir"), true);
+        root.join("test-dst-dir", "test-file.txt").readFile.should.equal("test-42");
+    }
+
+    /** Copy file or directory to destination
+      * If source is a file, then copyFileTo will be use to copy it.
+      * If source is a directory, then more complex logic will be applied:
+      *     - if dest already exists and it is not dir, then exception will be raised.
+      *     - if dest already exists and it is dir, then source dir will be copied inseide that dir with it's name
+      *     - if dest does not exists, then current directory will be copied to dest path.
+      *
+      * Params:
+      *     dest = destination path to copy content of this.
+      *     copy_mode = Describe how to copy.
+      *         This param is reserved for future.
+      *         Currently there is only single value available - `Standard`
+      * Throws:
+      *     PathException: when cannot copy
+      **/
     void copyTo(in Path dest, CopyMode copy_mode=CopyMode.Standard) const {
         import std.stdio;
         if (isDir) {
             Path dst_root = dest.toAbsolute;
             if (dst_root.exists) {
                 enforce!PathException(
-                    dest.isDir,
-                    "Cannot copy! Destination %s already exists and it is not directory!".format(dest));
+                    dst_root.isDir,
+                    "Cannot copy! Destination %s already exists and it is not directory!".format(dst_root));
                 dst_root = dst_root.join(this.baseName);
+                enforce!PathException(
+                    !dst_root.exists,
+                    "Cannot copy! Destination %s already exists!".format(dst_root));
             }
             std.file.mkdirRecurse(dst_root._path);
             auto src_root = this.toAbsolute();
@@ -406,10 +597,12 @@ struct Path {
         }
     }
 
+    /// ditto
     void copyTo(in string dest, CopyMode copy_mode=CopyMode.Standard) const {
         copyTo(Path(dest), copy_mode);
     }
 
+    ///
     unittest {
         import dshould;
         auto cdir = std.file.getcwd;
@@ -506,6 +699,11 @@ struct Path {
         root.join("test-dir-cpy-2", "test-dir", "d2", "f2.txt").exists.should.be(true);
         root.join("test-dir-cpy-2", "test-dir", "d2", "f2.txt").isFile.should.be(true);
 
+        // Try again to copy non-empty dir to already existing dir
+        // where dir with same base name already exists
+        root.join("test-dir").copyTo(root.join("test-dir-cpy-2")).should.throwA!PathException;
+
+
         // Change dir to our temp directory and test copying using
         // relative paths
         root.chdir;
@@ -564,11 +762,17 @@ struct Path {
 
     }
 
+    /** Remove file or directory referenced by this path.
+      * This operation is recursive, so if path references to a direcotry,
+      * then directory itself and all content inside referenced dir will be
+      * removed
+      **/
     void remove() const {
         if (isFile) std.file.remove(_path.expandTilde);
         else std.file.rmdirRecurse(_path.expandTilde);
     }
 
+    ///
     unittest {
         import dshould;
         Path root = createTempPath();
@@ -633,8 +837,13 @@ struct Path {
         }
     }
 
+    /** Rename current path.
+      *
+      * Note: case of moving file/dir between filesystesm is not tested.
+      *
+      * Throws: PathException when destination already exists
+      **/
     void rename(in Path to) const {
-        // TODO: Add support for recursive renames
         // TODO: Add support to move files between filesystems
         enforce!PathException(
             !to.exists,
@@ -642,10 +851,12 @@ struct Path {
         return std.file.rename(_path.expandTilde, to._path.expandTilde);
     }
 
+    /// ditto
     void rename(in string to) const {
         return rename(Path(to));
     }
 
+    ///
     unittest {
         import dshould;
         Path root = createTempPath();
@@ -737,11 +948,18 @@ struct Path {
         }
     }
 
+    /** Create directory by this path
+      * Params:
+      *     recursive = if set to true, then
+      *         parent directories will be created if not exist
+      * Throws: FileException if cannot create dir (it already exists)
+      **/
     void mkdir(in bool recursive=false) const {
         if (recursive) std.file.mkdirRecurse(std.path.expandTilde(_path));
         else std.file.mkdir(std.path.expandTilde(_path));
     }
 
+    ///
     unittest {
         import dshould;
         Path root = createTempPath();
@@ -762,6 +980,7 @@ struct Path {
         root.join("test-dir", "subdir").exists.should.be(true);
     }
 
+    ///
     unittest {
         import dshould;
         Path root = createTempPath();
@@ -776,23 +995,116 @@ struct Path {
         root.join("test-dir", "subdir").exists.should.be(true);
     }
 
-
-    auto openFile(in string openMode = "rb") const {
+    /** Open file and return `std.stdio.File` struct with opened file
+      * Params:
+      *     openMode = string representing open mode with
+      *         same semantic as in C standard lib
+      *         $(HTTP cplusplus.com/reference/clibrary/cstdio/fopen.html, fopen) function.
+      * Returns:
+      *     std.stdio.File struct
+      **/
+    std.stdio.File openFile(in string openMode = "rb") const {
         static import std.stdio;
 
         return std.stdio.File(_path.expandTilde, openMode);
     }
 
+    ///
+    unittest {
+        import dshould;
+        Path root = createTempPath();
+        scope(exit) root.remove();
+
+        auto test_file = root.join("test-create.txt").openFile("wt");
+        scope(exit) test_file.close();
+        test_file.write("Test1");
+        test_file.flush();
+        root.join("test-create.txt").readFile().should.equal("Test1");
+        test_file.write("12");
+        test_file.flush();
+        root.join("test-create.txt").readFile().should.equal("Test112");
+    }
+
+    /** Write data to file as is
+      * Params:
+      *     buffer = untypes array to write to file.
+      * Throws:
+      *     FileException in error
+      **/
     void writeFile(in void[] buffer) const {
         return std.file.write(_path.expandTilde, buffer);
     }
 
+    ///
+    unittest {
+        import dshould;
+        Path root = createTempPath();
+        scope(exit) root.remove();
+
+        root.join("test-write-1.txt").exists.should.be(false);
+        root.join("test-write-1.txt").writeFile("Hello world");
+        root.join("test-write-1.txt").exists.should.be(true);
+        root.join("test-write-1.txt").readFile.should.equal("Hello world");
+
+        ubyte[] data = [1, 7, 13, 5, 9];
+        root.join("test-write-2.txt").exists.should.be(false);
+        root.join("test-write-2.txt").writeFile(data);
+        root.join("test-write-2.txt").exists.should.be(true);
+        ubyte[] rdata = cast(ubyte[])root.join("test-write-2.txt").readFile;
+        rdata.length.should.equal(5);
+        rdata[0].should.equal(1);
+        rdata[1].should.equal(7);
+        rdata[2].should.equal(13);
+        rdata[3].should.equal(5);
+        rdata[4].should.equal(9);
+    }
+
+    /** Append data to file as is
+      * Params:
+      *     buffer = untypes array to write to file.
+      * Throws:
+      *     FileException in error
+      **/
     void appendFile(in void[] buffer) const {
         return std.file.append(_path.expandTilde, buffer);
     }
 
-    auto readFile() const {
-        return std.file.read(_path.expandTilde);
+    ///
+    unittest {
+        import dshould;
+        Path root = createTempPath();
+        scope(exit) root.remove();
+
+        ubyte[] data = [1, 7, 13, 5, 9];
+        ubyte[] data2 = [8, 17];
+        root.join("test-write-2.txt").exists.should.be(false);
+        root.join("test-write-2.txt").writeFile(data);
+        root.join("test-write-2.txt").appendFile(data2);
+        root.join("test-write-2.txt").exists.should.be(true);
+        ubyte[] rdata = cast(ubyte[])root.join("test-write-2.txt").readFile;
+        rdata.length.should.equal(7);
+        rdata[0].should.equal(1);
+        rdata[1].should.equal(7);
+        rdata[2].should.equal(13);
+        rdata[3].should.equal(5);
+        rdata[4].should.equal(9);
+        rdata[5].should.equal(8);
+        rdata[6].should.equal(17);
+    }
+
+
+    /** Read entire contents of file `name` and returns it as an untyped
+      * array. If the file size is larger than `upTo`, only `upTo`
+      * bytes are _read.
+      * Params:
+      *     upTo = if present, the maximum number of bytes to _read
+      * Returns:
+      *     Untyped array of bytes _read
+      * Throws:
+      *     FileException in error
+      **/
+    auto readFile(size_t upTo=size_t.max) const {
+        return std.file.read(_path.expandTilde, upTo);
     }
 
     unittest {
@@ -800,26 +1112,37 @@ struct Path {
         Path root = createTempPath();
         scope(exit) root.remove();
 
-        auto test_c_file = root.join("test-create.txt");
-        test_c_file.exists.should.be(false);
+        root.join("test-create.txt").exists.should.be(false);
 
-        // Test file read/write
-        test_c_file.writeFile("Hello World");
-        test_c_file.exists.should.be(true);
-        test_c_file.readFile.should.equal("Hello World");
-        test_c_file.appendFile("!");
-        test_c_file.readFile.should.equal("Hello World!");
+        // Test file read/write/apppend
+        root.join("test-create.txt").writeFile("Hello World");
+        root.join("test-create.txt").exists.should.be(true);
+        root.join("test-create.txt").readFile.should.equal("Hello World");
+        root.join("test-create.txt").appendFile("!");
+        root.join("test-create.txt").readFile.should.equal("Hello World!");
 
         // Try to remove file
-        test_c_file.exists.should.be(true);
-        test_c_file.remove();
-        test_c_file.exists.should.be(false);
+        root.join("test-create.txt").exists.should.be(true);
+        root.join("test-create.txt").remove();
+        root.join("test-create.txt").exists.should.be(false);
+
+        // Try to read data as bytes
+        ubyte[] data = [1, 7, 13, 5, 9];
+        root.join("test-write-2.txt").exists.should.be(false);
+        root.join("test-write-2.txt").writeFile(data);
+        root.join("test-write-2.txt").exists.should.be(true);
+        ubyte[] rdata = cast(ubyte[])root.join("test-write-2.txt").readFile;
+        rdata.length.should.equal(5);
+        rdata[0].should.equal(1);
+        rdata[1].should.equal(7);
+        rdata[2].should.equal(13);
+        rdata[3].should.equal(5);
+        rdata[4].should.equal(9);
     }
 
-
-
-
+    // TODO: Add readFileText method
     // TODO: to add:
     //       - match pattern
     //       - Handle symlinks
+    //       - Add readFileText
 }
