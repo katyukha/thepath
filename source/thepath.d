@@ -11,21 +11,33 @@ private import std.exception: enforce;
 
 
 // Mostly used for unitetests
-private string createTempDirectory(string prefix="tmp") {
+private string createTempDirectory(in string prefix="tmp") {
     import std.file : tempDir;
-    return createTempDirectory(tempDir, prefix=prefix);
+    return createTempDirectory(tempDir, prefix);
 }
 
-private string createTempDirectory(string path, string prefix="tmp") {
+private string createTempDirectory(in string path, in string prefix="tmp") {
     version(Posix) {
-        string tempdir_template= std.path.buildNormalizedPath(
-            std.path.expandTilde(path), prefix ~ "-XXXXXX");
         import std.string : fromStringz;
         import std.conv: to;
         import core.sys.posix.stdlib : mkdtemp;
-        char[] tempname_str = tempdir_template.dup ~ "\0";
+
+        // Prepare template for mkdtemp function.
+        // It have to be mutable array of chars ended with zero to be compatibale
+        // with mkdtemp function.
+        scope char[] tempname_str = std.path.buildNormalizedPath(
+            std.path.expandTilde(path),
+            prefix ~ "-XXXXXX").dup ~ "\0";
+
+        // mkdtemp will modify tempname_str directly. and res is pointer to
+        // tempname_str in case of success.
         char* res = mkdtemp(tempname_str.ptr);
         enforce(res !is null, "Cannot create temporary directory");
+
+
+        // Converting to string will duplicate result.
+        // But may be it have sense to do it in more obvious way
+        // for example: return tempname_str[0..$-1].idup;
         return to!string(res.fromStringz);
     } else {
         import std.ascii: letters;
@@ -48,21 +60,23 @@ private string createTempDirectory(string path, string prefix="tmp") {
     }
 }
 
-private Path createTempPath(string prefix="tmp") {
+private Path createTempPath(in string prefix="tmp") {
     return Path(createTempDirectory(prefix));
 }
 
-private Path createTempPath(string path, string prefix="tmp") {
+private Path createTempPath(in string path, in string prefix="tmp") {
     return Path(createTempDirectory(path, prefix));
 }
 
-private Path createTempPath(Path path, string prefix="tmp") {
+private Path createTempPath(in Path path, in string prefix="tmp") {
     return createTempPath(path.toString, prefix);
 }
 
 
-
+/// PathException - will be raise on failure on path (or file) operations
 class PathException : Exception {
+
+    /// Main constructor
     this(string msg, string file = __FILE__, size_t line = __LINE__) {
         super(msg, file, line);
     }
@@ -136,17 +150,17 @@ struct Path {
         return std.file.isFile(_path.expandTilde);
     }
 
-    // Determine if path is directory.
+    /// Determine if path is directory.
     bool isDir() const {
         return std.file.isDir(_path.expandTilde);
     }
 
-    // Determine if path is symlink
+    /// Determine if path is symlink
     bool isSymlink() const {
         return std.file.isSymlink(_path.expandTilde);
     }
 
-    // Check if path exists
+    /// Check if path exists
     bool exists() const {
         return std.file.exists(_path.expandTilde);
     }
@@ -298,8 +312,6 @@ struct Path {
     unittest {
         import dshould;
         version(Posix) {
-            Path root = Path("/tmp");
-
             Path("/tmp").parent.toString.should.equal("/");
             Path("/").parent.toString.should.equal("/");
             Path("/tmp/parent/child").parent.toString.should.equal("/tmp/parent");
