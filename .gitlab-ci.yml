@@ -1,7 +1,3 @@
-stages:
-  - lint
-  - test
-
 lint:
   image: ubuntu:20.04
   before_script:
