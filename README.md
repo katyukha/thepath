@@ -28,7 +28,7 @@ import thepath;
 
 
 Path app_dir = Path("~/.local/my-app");
-Path catalog_dir = app_dir.join('catalog');
+Path catalog_dir = app_dir.join("catalog");
 
 
 void init() {
