@@ -6,7 +6,7 @@ lint:
   image: ubuntu:20.04
   before_script:
     - apt update
-    - apt install wget
+    - apt install -yqq wget
     - wget -O /tmp/dmd.deb https://s3.us-west-2.amazonaws.com/downloads.dlang.org/releases/2022/dmd_2.100.2-0_amd64.deb
     - wget -O /tmp/dmd.deb http://downloads.dlang.org/releases/2.x/2.100.2/dmd_2.100.2-0_amd64.deb
     - apt install -yqq /tmp/dmd.deb
@@ -18,7 +18,7 @@ lint:
   image: ubuntu:20.04
   before_script:
     - apt update
-    - apt install wget
+    - apt install -yqq wget
     - wget -O /tmp/dmd.deb https://s3.us-west-2.amazonaws.com/downloads.dlang.org/releases/2022/dmd_2.100.2-0_amd64.deb
     - wget -O /tmp/dmd.deb http://downloads.dlang.org/releases/2.x/2.100.2/dmd_2.100.2-0_amd64.deb
     - apt install -yqq /tmp/dmd.deb
