@@ -10,13 +10,27 @@ private import std.format: format;
 private import std.exception: enforce;
 
 
-// Mostly used for unitetests
-private string createTempDirectory(in string prefix="tmp") {
+/** Create temporary directory
+  * Note, that caller is responsible to remove created directory.
+  * The temp directory will be created inside specified path.
+  * 
+  * Params:
+  *     path = path to already existing directory to create
+  *         temp directory inside. Default: std.file.tempDir
+  *     prefix = prefix to be used in name of temp directory. Default: "tmp"
+  * Returns: string, representing path to created temporary directory
+  * Throws: PathException in case of error
+  **/
+string createTempDirectory(in string prefix="tmp") {
     import std.file : tempDir;
     return createTempDirectory(tempDir, prefix);
 }
 
-private string createTempDirectory(in string path, in string prefix="tmp") {
+/// ditto
+string createTempDirectory(in string path, in string prefix) {
+    enforce!PathException(
+        std.file.exists(path),
+        "Path provided for 'createTempDirectory' does not exists");
     version(Posix) {
         import std.string : fromStringz;
         import std.conv: to;
@@ -32,7 +46,8 @@ private string createTempDirectory(in string path, in string prefix="tmp") {
         // mkdtemp will modify tempname_str directly. and res is pointer to
         // tempname_str in case of success.
         char* res = mkdtemp(tempname_str.ptr);
-        enforce(res !is null, "Cannot create temporary directory");
+        enforce!PathException(
+            res !is null, "Cannot create temporary directory");
 
 
         // Converting to string will duplicate result.
@@ -60,15 +75,29 @@ private string createTempDirectory(in string path, in string prefix="tmp") {
     }
 }
 
-private Path createTempPath(in string prefix="tmp") {
+
+/** Create temporary directory
+  * Note, that caller is responsible to remove created directory.
+  * The temp directory will be created inside specified path.
+  *
+  * Params:
+  *     path = path to already existing directory to create
+  *         temp directory inside. Default: std.file.tempDir
+  *     prefix = prefix to be used in name of temp directory. Default: "tmp"
+  * Returns: Path to created temp directory
+  * Throws: PathException in case of error
+  **/
+Path createTempPath(in string prefix="tmp") {
     return Path(createTempDirectory(prefix));
 }
 
-private Path createTempPath(in string path, in string prefix="tmp") {
+/// ditto
+Path createTempPath(in string path, in string prefix) {
     return Path(createTempDirectory(path, prefix));
 }
 
-private Path createTempPath(in Path path, in string prefix="tmp") {
+/// ditto
+Path createTempPath(in Path path, in string prefix) {
     return createTempPath(path.toString, prefix);
 }
 
@@ -494,8 +523,8 @@ struct Path {
       *     rewrite = do we need to rewrite file if it already exists?
       * Throws:
       *     PathException if source file does not exists or
-      *                   if destination already exists and
-      *                   it is not a directory and rewrite is set to false.
+      *         if destination already exists and
+      *         it is not a directory and rewrite is set to false.
       **/
     void copyFileTo(in Path dest, in bool rewrite=false) const {
         enforce!PathException(
@@ -569,7 +598,7 @@ struct Path {
       *         This param is reserved for future.
       *         Currently there is only single value available - `Standard`
       * Throws:
-      *     PathException: when cannot copy
+      *     PathException when cannot copy
       **/
     void copyTo(in Path dest, CopyMode copy_mode=CopyMode.Standard) const {
         import std.stdio;
@@ -853,7 +882,8 @@ struct Path {
       *
       * Note: case of moving file/dir between filesystesm is not tested.
       *
-      * Throws: PathException when destination already exists
+      * Throws:
+      *     PathException when destination already exists
       **/
     void rename(in Path to) const {
         // TODO: Add support to move files between filesystems
@@ -964,7 +994,8 @@ struct Path {
       * Params:
       *     recursive = if set to true, then
       *         parent directories will be created if not exist
-      * Throws: FileException if cannot create dir (it already exists)
+      * Throws:
+      *     FileException if cannot create dir (it already exists)
       **/
     void mkdir(in bool recursive=false) const {
         if (recursive) std.file.mkdirRecurse(std.path.expandTilde(_path));
@@ -1041,7 +1072,7 @@ struct Path {
       * Params:
       *     buffer = untypes array to write to file.
       * Throws:
-      *     FileException in error
+      *     FileException in case of  error
       **/
     void writeFile(in void[] buffer) const {
         return std.file.write(_path.expandTilde, buffer);
@@ -1075,7 +1106,7 @@ struct Path {
       * Params:
       *     buffer = untypes array to write to file.
       * Throws:
-      *     FileException in error
+      *     FileException in case of  error
       **/
     void appendFile(in void[] buffer) const {
         return std.file.append(_path.expandTilde, buffer);
@@ -1113,7 +1144,7 @@ struct Path {
       * Returns:
       *     Untyped array of bytes _read
       * Throws:
-      *     FileException in error
+      *     FileException in case of error
       **/
     auto readFile(size_t upTo=size_t.max) const {
         return std.file.read(_path.expandTilde, upTo);
