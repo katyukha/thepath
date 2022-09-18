@@ -10,34 +10,58 @@ private import std.format: format;
 private import std.exception: enforce;
 
 
-// Mostly used for unitetests
-private string createTempDirectory(string prefix="tmp") {
+/** Create temporary directory
+  * Note, that caller is responsible to remove created directory.
+  * The temp directory will be created inside specified path.
+  * 
+  * Params:
+  *     path = path to already existing directory to create
+  *         temp directory inside. Default: std.file.tempDir
+  *     prefix = prefix to be used in name of temp directory. Default: "tmp"
+  * Returns: string, representing path to created temporary directory
+  * Throws: PathException in case of error
+  **/
+string createTempDirectory(in string prefix="tmp") {
     import std.file : tempDir;
-    return createTempDirectory(tempDir, prefix=prefix);
+    return createTempDirectory(tempDir, prefix);
 }
 
-private string createTempDirectory(string path, string prefix="tmp") {
+/// ditto
+string createTempDirectory(in string path, in string prefix) {
     version(Posix) {
-        string tempdir_template= std.path.buildNormalizedPath(
-            std.path.expandTilde(path), prefix ~ "-XXXXXX");
         import std.string : fromStringz;
         import std.conv: to;
         import core.sys.posix.stdlib : mkdtemp;
-        char[] tempname_str = tempdir_template.dup ~ "\0";
+
+        // Prepare template for mkdtemp function.
+        // It have to be mutable array of chars ended with zero to be compatibale
+        // with mkdtemp function.
+        scope char[] tempname_str = std.path.buildNormalizedPath(
+            std.path.expandTilde(path),
+            prefix ~ "-XXXXXX").dup ~ "\0";
+
+        // mkdtemp will modify tempname_str directly. and res is pointer to
+        // tempname_str in case of success.
         char* res = mkdtemp(tempname_str.ptr);
-        enforce(res !is null, "Cannot create temporary directory");
+        enforce!PathException(
+            res !is null, "Cannot create temporary directory");
+
+        // Converting to string will duplicate result.
+        // But may be it have sense to do it in more obvious way
+        // for example: return tempname_str[0..$-1].idup;
         return to!string(res.fromStringz);
     } else {
         import std.ascii: letters;
         import std.random: uniform;
 
+        // Generate new random temp path to test using provided path and prefix
+        // as template.
         string generate_temp_dir() {
-            string suffix = "";
+            string suffix = "-";
             for(ubyte i; i<6; i++) suffix ~= letters[uniform(0, $)];
             return std.path.buildNormalizedPath(
                 std.path.expandTilde(path), prefix ~ suffix);
         }
-
 
         string temp_dir = generate_temp_dir();
         while (std.file.exists(temp_dir)) {
@@ -48,37 +72,40 @@ private string createTempDirectory(string path, string prefix="tmp") {
     }
 }
 
-private Path createTempPath(string prefix="tmp") {
+
+/** Create temporary directory
+  * Note, that caller is responsible to remove created directory.
+  * The temp directory will be created inside specified path.
+  *
+  * Params:
+  *     path = path to already existing directory to create
+  *         temp directory inside. Default: std.file.tempDir
+  *     prefix = prefix to be used in name of temp directory. Default: "tmp"
+  * Returns: Path to created temp directory
+  * Throws: PathException in case of error
+  **/
+Path createTempPath(in string prefix="tmp") {
     return Path(createTempDirectory(prefix));
 }
 
-private Path createTempPath(string path, string prefix="tmp") {
+/// ditto
+Path createTempPath(in string path, in string prefix) {
     return Path(createTempDirectory(path, prefix));
 }
 
-private Path createTempPath(Path path, string prefix="tmp") {
+/// ditto
+Path createTempPath(in Path path, in string prefix) {
     return createTempPath(path.toString, prefix);
 }
 
 
-
+/// PathException - will be raise on failure on path (or file) operations
 class PathException : Exception {
+
+    /// Main constructor
     this(string msg, string file = __FILE__, size_t line = __LINE__) {
         super(msg, file, line);
     }
-}
-
-/// Determines the way to copy file/dir
-enum CopyMode {
-
-    /** The standard copy.
-     *  In case of copying directory, it will be copied recursively.
-     *  If destination path already exists and it is directory, then
-     *  source will be copied inside that direcotry with same basename.
-     *  If destination path already exists and it is not directory, then
-     *  error will be raised.
-     **/
-    Standard,
 }
 
 
@@ -136,17 +163,17 @@ struct Path {
         return std.file.isFile(_path.expandTilde);
     }
 
-    // Determine if path is directory.
+    /// Determine if path is directory.
     bool isDir() const {
         return std.file.isDir(_path.expandTilde);
     }
 
-    // Determine if path is symlink
+    /// Determine if path is symlink
     bool isSymlink() const {
         return std.file.isSymlink(_path.expandTilde);
     }
 
-    // Check if path exists
+    /// Check if path exists
     bool exists() const {
         return std.file.exists(_path.expandTilde);
     }
@@ -298,8 +325,6 @@ struct Path {
     unittest {
         import dshould;
         version(Posix) {
-            Path root = Path("/tmp");
-
             Path("/tmp").parent.toString.should.equal("/");
             Path("/").parent.toString.should.equal("/");
             Path("/tmp/parent/child").parent.toString.should.equal("/tmp/parent");
@@ -482,8 +507,8 @@ struct Path {
       *     rewrite = do we need to rewrite file if it already exists?
       * Throws:
       *     PathException if source file does not exists or
-      *                   if destination already exists and
-      *                   it is not a directory and rewrite is set to false.
+      *         if destination already exists and
+      *         it is not a directory and rewrite is set to false.
       **/
     void copyFileTo(in Path dest, in bool rewrite=false) const {
         enforce!PathException(
@@ -551,15 +576,14 @@ struct Path {
       *     - if dest already exists and it is dir, then source dir will be copied inseide that dir with it's name
       *     - if dest does not exists, then current directory will be copied to dest path.
       *
+      * Note, that work with symlinks have to be improved. Not tested yet.
+      *
       * Params:
       *     dest = destination path to copy content of this.
-      *     copy_mode = Describe how to copy.
-      *         This param is reserved for future.
-      *         Currently there is only single value available - `Standard`
       * Throws:
-      *     PathException: when cannot copy
+      *     PathException when cannot copy
       **/
-    void copyTo(in Path dest, CopyMode copy_mode=CopyMode.Standard) const {
+    void copyTo(in Path dest) const {
         import std.stdio;
         if (isDir) {
             Path dst_root = dest.toAbsolute;
@@ -598,8 +622,8 @@ struct Path {
     }
 
     /// ditto
-    void copyTo(in string dest, CopyMode copy_mode=CopyMode.Standard) const {
-        copyTo(Path(dest), copy_mode);
+    void copyTo(in string dest) const {
+        copyTo(Path(dest));
     }
 
     ///
@@ -841,7 +865,8 @@ struct Path {
       *
       * Note: case of moving file/dir between filesystesm is not tested.
       *
-      * Throws: PathException when destination already exists
+      * Throws:
+      *     PathException when destination already exists
       **/
     void rename(in Path to) const {
         // TODO: Add support to move files between filesystems
@@ -952,7 +977,8 @@ struct Path {
       * Params:
       *     recursive = if set to true, then
       *         parent directories will be created if not exist
-      * Throws: FileException if cannot create dir (it already exists)
+      * Throws:
+      *     FileException if cannot create dir (it already exists)
       **/
     void mkdir(in bool recursive=false) const {
         if (recursive) std.file.mkdirRecurse(std.path.expandTilde(_path));
@@ -1029,7 +1055,7 @@ struct Path {
       * Params:
       *     buffer = untypes array to write to file.
       * Throws:
-      *     FileException in error
+      *     FileException in case of  error
       **/
     void writeFile(in void[] buffer) const {
         return std.file.write(_path.expandTilde, buffer);
@@ -1063,7 +1089,7 @@ struct Path {
       * Params:
       *     buffer = untypes array to write to file.
       * Throws:
-      *     FileException in error
+      *     FileException in case of  error
       **/
     void appendFile(in void[] buffer) const {
         return std.file.append(_path.expandTilde, buffer);
@@ -1101,7 +1127,7 @@ struct Path {
       * Returns:
       *     Untyped array of bytes _read
       * Throws:
-      *     FileException in error
+      *     FileException in case of error
       **/
     auto readFile(size_t upTo=size_t.max) const {
         return std.file.read(_path.expandTilde, upTo);

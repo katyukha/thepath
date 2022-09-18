@@ -1,7 +1,3 @@
-stages:
-  - lint
-  - test
-
 lint:
   image: ubuntu:20.04
   before_script:
@@ -13,8 +9,9 @@ lint:
     - apt install -yqq -f
   script:
     - dub lint
+  allow_failure: true
 
-lint:
+test:
   image: ubuntu:20.04
   before_script:
     - apt update
