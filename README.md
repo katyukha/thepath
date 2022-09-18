@@ -6,12 +6,19 @@ Inspired by [Python's pathlib](https://docs.python.org/3/library/pathlib.html)
 and [D port of pathlib](https://code.dlang.org/packages/pathlib) but
 implementing it in different way.
 
-Following principles used in this project
-- Implement struct or class `Path`
-- Any operation on path have to produce new instance of `Path`
+*NOTE*: this is alpha version, and api is still subject for change
+
+Following ideas used in this project
+- Implement struct or class `Path` that have to represent
+  single path to file or directory.
+- Any operation on path have to create new instance of `Path`,
+  thus no implicit modification of Path allowed
   to avoid side effects
-- Simplify naming for frequent operations (introducing new type for this allows to do it).
-- Automatic tilde expansion when needed (for example before file operations);
+- Simplify naming for frequent operations
+  (introducing new type for this allows to do it without name collisions).
+- Automatic tilde expansion when needed (for example before file operations),
+  thus allowing to easily work with patth like `~/my/path`
+  without any special work needed.
 
 
 ## Examples

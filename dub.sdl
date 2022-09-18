@@ -1,5 +1,5 @@
 name "thepath"
-description "The Path - the ultimate path library for D"
+description "The Path - the easy way to work with paths and files in D"
 authors "Dmytro Katyukha"
 copyright "Copyright © 2022, Dmytro Katyukha"
 license "MPL-2.0"
