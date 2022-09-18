@@ -108,19 +108,6 @@ class PathException : Exception {
     }
 }
 
-/// Determines the way to copy file/dir
-enum CopyMode {
-
-    /** The standard copy.
-     *  In case of copying directory, it will be copied recursively.
-     *  If destination path already exists and it is directory, then
-     *  source will be copied inside that direcotry with same basename.
-     *  If destination path already exists and it is not directory, then
-     *  error will be raised.
-     **/
-    Standard,
-}
-
 
 /** Main struct to work with paths.
   **/
@@ -589,15 +576,14 @@ struct Path {
       *     - if dest already exists and it is dir, then source dir will be copied inseide that dir with it's name
       *     - if dest does not exists, then current directory will be copied to dest path.
       *
+      * Note, that work with symlinks have to be improved. Not tested yet.
+      *
       * Params:
       *     dest = destination path to copy content of this.
-      *     copy_mode = Describe how to copy.
-      *         This param is reserved for future.
-      *         Currently there is only single value available - `Standard`
       * Throws:
       *     PathException when cannot copy
       **/
-    void copyTo(in Path dest, CopyMode copy_mode=CopyMode.Standard) const {
+    void copyTo(in Path dest) const {
         import std.stdio;
         if (isDir) {
             Path dst_root = dest.toAbsolute;
@@ -636,8 +622,8 @@ struct Path {
     }
 
     /// ditto
-    void copyTo(in string dest, CopyMode copy_mode=CopyMode.Standard) const {
-        copyTo(Path(dest), copy_mode);
+    void copyTo(in string dest) const {
+        copyTo(Path(dest));
     }
 
     ///
