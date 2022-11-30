@@ -404,7 +404,30 @@ struct Path {
         import std.algorithm.iteration: map;
         return std.file.dirEntries(
             _path, mode, followSymlink).map!(a => Path(a));
+    }
 
+    ///
+    unittest {
+        import dshould;
+        Path root = createTempPath();
+        scope(exit) root.remove();
+
+        // Create sample directory structure
+        root.join("d1", "d2").mkdir(true);
+        root.join("d1", "test1.txt").writeFile("Test 1");
+        root.join("d1", "d2", "test2.txt").writeFile("Test 2");
+
+        // Walk through the derectory d1
+        Path[] result;
+        foreach(p; root.join("d1").walk(SpanMode.breadth)) {
+            result ~= p;
+        }
+
+        result.should.equal([
+            root.join("d1", "d2"),
+            root.join("d1", "d2", "test2.txt"),
+            root.join("d1", "test1.txt"),
+        ]);
     }
 
     /// Change current working directory to this.
