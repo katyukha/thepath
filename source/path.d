@@ -5,6 +5,7 @@ static public import std.file: SpanMode;
 static private import std.path;
 static private import std.file;
 static private import std.stdio;
+private static import std.process;
 private import std.path: expandTilde;
 private import std.format: format;
 private import std.exception: enforce;
@@ -16,7 +17,7 @@ private import thepath.exception: PathException;
   **/
 struct Path {
     // TODO: Deside if we need to make _path by default configured to current directory or to allow path to be null
-    private string _path=".";
+    private string _path=null; //".";
 
     /** Main constructor to build new Path from string
       * Params:
@@ -44,6 +45,26 @@ struct Path {
         }
     }
 
+    /** Check if path is null
+      * Returns: true if this path is null (not set)
+      **/
+    bool isNull() const {
+        return _path is null;
+    }
+
+    ///
+    unittest {
+        import dshould;
+
+        Path().isNull.should.be(true);
+        Path(".").isNull.should.be(false);
+        Path("some-path").isNull.should.be(false);
+
+        Path default_path;
+
+        default_path.isNull.should.be(true);
+    }
+
     /** Check if path is valid.
       * Returns: true if this is valid path.
       **/
@@ -51,9 +72,31 @@ struct Path {
         return std.path.isValidPath(_path);
     }
 
+    ///
+    unittest {
+        import dshould;
+
+        Path().isValid.should.be(false);
+        Path(".").isValid.should.be(true);
+        Path("some-path").isValid.should.be(true);
+    }
+
     /// Check if path is absolute
     bool isAbsolute() const {
         return std.path.isAbsolute(_path);
+    }
+
+    ///
+    unittest {
+        import dshould;
+
+        Path().isValid.should.be(false);
+        Path(".").isAbsolute.should.be(false);
+        Path("some-path").isAbsolute.should.be(false);
+
+        version(Posix) {
+            Path("/test/path").isAbsolute.should.be(true);
+        }
     }
 
     /// Check if path starts at root directory (or drive letter)
@@ -683,7 +726,7 @@ struct Path {
             home_tmp.join("test-dir", "d2").isDir.should.be(true);
             home_tmp.join("test-dir", "d2", "f2.txt").exists.should.be(true);
             home_tmp.join("test-dir", "d2", "f2.txt").isFile.should.be(true);
-        } 
+        }
 
 
 
@@ -1071,16 +1114,16 @@ struct Path {
     }
 
     /** Read text content of the file.
-        Technicall just a call to $(REF readText, std, file).
-
-        Params:
-            S = template parameter that represents type of string to read
-        Returns:
-            text read from file.
-        Throws:
-            $(LREF FileException) if there is an error reading the file,
-            $(REF UTFException, std, utf) on UTF decoding error.
-    **/
+      * Technicall just a call to $(REF readText, std, file).
+      *
+      * Params:
+      *     S = template parameter that represents type of string to read
+      * Returns:
+      *     text read from file.
+      * Throws:
+      *     $(LREF FileException) if there is an error reading the file,
+      *     $(REF UTFException, std, utf) on UTF decoding error.
+      **/
     auto readFileText(S=string)() {
         return std.file.readText!S(_path.expandTilde);
     }
@@ -1113,10 +1156,10 @@ struct Path {
     }
 
     /** Get attributes of the path
-
-        Returns:
-            uint - represening attributes of the file
-    **/
+      *
+      *  Returns:
+      *      uint - represening attributes of the file
+      **/
     auto getAttributes() {
         return std.file.getAttributes(_path.expandTilde);
     }
@@ -1145,17 +1188,17 @@ struct Path {
     }
 
     /** Check if file has numeric attributes.
-        This method check if all bits specified by param 'attributes' are set.
-
-        Params:
-            attributes = numeric attributes (bit mask) to check
-
-        Returns:
-            true if all attributes present on file.
-            false if at lease one bit specified by attributes is not set.
-
-    **/
-    bool hasAttributes(uint attributes) {
+      * This method check if all bits specified by param 'attributes' are set.
+      *
+      * Params:
+      *     attributes = numeric attributes (bit mask) to check
+      *
+      * Returns:
+      *     true if all attributes present on file.
+      *     false if at lease one bit specified by attributes is not set.
+      *
+      **/
+    bool hasAttributes(in uint attributes) {
         return (this.getAttributes() & attributes) == attributes;
 
     }
@@ -1196,12 +1239,12 @@ struct Path {
     }
 
     /** Set attributes of the path
+      *
+      *  Params:
+      *      attributes = value representing attributes to set on path.
+     **/
 
-        Params:
-            attributes = value representing attributes to set on path.
-    **/
-
-    void setAttributes(uint attributes) {
+    void setAttributes(in uint attributes) {
         std.file.setAttributes(_path, attributes);
     }
 
@@ -1253,6 +1296,75 @@ struct Path {
         root.join("test-file.txt").hasAttributes(S_IXOTH).should.be(false);
     }
 
+    /** Execute the file pointed by path
+
+        Params:
+            args = arguments to be passed to program
+            env = associative array that represent environment variables
+               to be passed to program pointed by path
+            workDir = Working directory for new process.
+            config = Parameters for process creation.
+               See See $(REF Config, std, process)
+            maxOutput = Max bytes of output to be captured
+        Returns:
+            An $(D std.typecons.Tuple!(int, "status", string, "output")).
+     **/
+    auto execute(P=string)(in string[] args=[],
+            in string[string] env=null,
+            in P workDir=null,
+            std.process.Config config=std.process.Config.none,
+            size_t maxOutput=size_t.max)
+    if (is(P == string)) {
+        return std.process.execute(
+            this._path ~ args, env, config, maxOutput, workDir);
+    }
+
+    /// ditto
+    auto execute(P=string)(in string[] args=[],
+            in string[string] env=null,
+            in P workDir=null,
+            std.process.Config config=std.process.Config.none,
+            size_t maxOutput=size_t.max)
+    if (is(P == Path)) {
+        return std.process.execute(
+            this._path ~ args, env, config, maxOutput, workDir.toString);
+    }
+
+
+    ///
+    version(Posix) unittest {
+        import dshould;
+        import std.conv: octal;
+        Path root = createTempPath();
+        scope(exit) root.remove();
+
+        // Create simple test script that will print its arguments
+        root.join("test-script").writeFile(
+            "#!/usr/bin/env bash\necho \"$@\";");
+
+        // Add permission to run this script
+        root.join("test-script").setAttributes(octal!755);
+
+        // Run test script without args
+        auto status1 = root.join("test-script").execute;
+        status1.status.should.be(0);
+        status1.output.should.equal("\n");
+
+        auto status2 = root.join("test-script").execute(["hello", "world"]);
+        status2.status.should.be(0);
+        status2.output.should.equal("hello world\n");
+
+        auto status3 = root.join("test-script").execute(["hello", "world\nplus"]);
+        status3.status.should.be(0);
+        status3.output.should.equal("hello world\nplus\n");
+
+        auto status4 = root.join("test-script").execute(
+                ["hello", "world"],
+                null,
+                root);
+        status4.status.should.be(0);
+        status4.output.should.equal("hello world\n");
+    }
 
     // TODO: to add:
     //       - match pattern
