@@ -1,3 +1,4 @@
+/// ThePath - easy way to work with paths and files
 module thepath;
 
 public import thepath.path: Path;

@@ -1,3 +1,4 @@
+/// Utility functions to work with paths
 module thepath.utils;
 
 private import std.exception: enforce;

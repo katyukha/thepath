@@ -1,4 +1,4 @@
-/// ThePath - easy way to work with paths and files
+/// This module defines Path - the main structure that represent's highlevel interface to paths
 module thepath.path;
 
 static public import std.file: SpanMode;
