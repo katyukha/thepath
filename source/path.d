@@ -1070,6 +1070,189 @@ struct Path {
         rdata[4].should.equal(9);
     }
 
+    /** Read text content of the file.
+        Technicall just a call to $(REF readText, std, file).
+
+        Params:
+            S = template parameter that represents type of string to read
+        Returns:
+            text read from file.
+        Throws:
+            $(LREF FileException) if there is an error reading the file,
+            $(REF UTFException, std, utf) on UTF decoding error.
+    **/
+    auto readFileText(S=string)() {
+        return std.file.readText!S(_path.expandTilde);
+    }
+
+
+    ///
+    unittest {
+        import dshould;
+        Path root = createTempPath();
+        scope(exit) root.remove();
+
+        // Write some utf-8 data from the file
+        root.join("test-utf-8.txt").writeFile("Hello World");
+
+        // Test that we read correct value
+        root.join("test-utf-8.txt").readFileText.should.equal("Hello World");
+
+        // Write some data in UTF-16 with BOM
+        root.join("test-utf-16.txt").writeFile("\uFEFFhi humans"w);
+
+        // Read utf-16 content
+        auto content = root.join("test-utf-16.txt").readFileText!wstring;
+
+        // Strip BOM if present.
+        import std.algorithm.searching : skipOver;
+        content.skipOver('\uFEFF');
+
+        // Ensure we read correct value
+        content.should.equal("hi humans"w);
+    }
+
+    /** Get attributes of the path
+
+        Returns:
+            uint - represening attributes of the file
+    **/
+    auto getAttributes() {
+        return std.file.getAttributes(_path.expandTilde);
+    }
+
+    /// Test if file has permission to run
+    version(Posix) unittest {
+        import dshould;
+        import std.conv: octal;
+        Path root = createTempPath();
+        scope(exit) root.remove();
+
+        // Here we have to import bitmasks from system;
+        import core.sys.posix.sys.stat;
+
+        root.join("test-file.txt").writeFile("Hello World!");
+        auto attributes = root.join("test-file.txt").getAttributes();
+
+        // Test that file has permissions 644
+        (attributes & octal!644).should.equal(octal!644);
+
+        // Test that file is readable by user
+        (attributes & S_IRUSR).should.equal(S_IRUSR);
+
+        // Test that file is not writeable by others
+        (attributes & S_IWOTH).should.not.equal(S_IWOTH);
+    }
+
+    /** Check if file has numeric attributes.
+        This method check if all bits specified by param 'attributes' are set.
+
+        Params:
+            attributes = numeric attributes (bit mask) to check
+
+        Returns:
+            true if all attributes present on file.
+            false if at lease one bit specified by attributes is not set.
+
+    **/
+    bool hasAttributes(uint attributes) {
+        return (this.getAttributes() & attributes) == attributes;
+
+    }
+
+    /// Example of checking attributes of file.
+    version(Posix) unittest {
+        import dshould;
+        import std.conv: octal;
+        Path root = createTempPath();
+        scope(exit) root.remove();
+
+        // Here we have to import bitmasks from system;
+        import core.sys.posix.sys.stat;
+
+        root.join("test-file.txt").writeFile("Hello World!");
+
+        // Check that file has numeric permissions 644
+        root.join("test-file.txt").hasAttributes(octal!644).should.be(true);
+
+        // Check that it is not 755
+        root.join("test-file.txt").hasAttributes(octal!755).should.be(false);
+
+        // Check that every user can read this file.
+        root.join("test-file.txt").hasAttributes(octal!444).should.be(true);
+
+        // Check that owner can read the file
+        // (do not check access rights for group and others)
+        root.join("test-file.txt").hasAttributes(octal!400).should.be(true);
+
+        // Test that file is readable by user
+        root.join("test-file.txt").hasAttributes(S_IRUSR).should.be(true);
+
+        // Test that file is writable by user
+        root.join("test-file.txt").hasAttributes(S_IWUSR).should.be(true);
+
+        // Test that file is not writable by others
+        root.join("test-file.txt").hasAttributes(S_IWOTH).should.be(false);
+    }
+
+    /** Set attributes of the path
+
+        Params:
+            attributes = value representing attributes to set on path.
+    **/
+
+    void setAttributes(uint attributes) {
+        std.file.setAttributes(_path, attributes);
+    }
+
+    /// Example of changing attributes of file.
+    version(Posix) unittest {
+        import dshould;
+        import std.conv: octal;
+        Path root = createTempPath();
+        scope(exit) root.remove();
+
+        // Here we have to import bitmasks from system;
+        import core.sys.posix.sys.stat;
+
+        root.join("test-file.txt").writeFile("Hello World!");
+
+        // Check that file has numeric permissions 644
+        root.join("test-file.txt").hasAttributes(octal!644).should.be(true);
+
+
+        auto attributes = root.join("test-file.txt").getAttributes();
+
+        // Test that file is readable by user
+        (attributes & S_IRUSR).should.equal(S_IRUSR);
+
+        // Test that file is not writeable by others
+        (attributes & S_IWOTH).should.not.equal(S_IWOTH);
+
+        // Add right to write file by others
+        root.join("test-file.txt").setAttributes(attributes | S_IWOTH);
+
+        // Test that file is now writable by others
+        root.join("test-file.txt").hasAttributes(S_IWOTH).should.be(true);
+
+        // Test that numeric permissions changed
+        root.join("test-file.txt").hasAttributes(octal!646).should.be(true);
+
+        // Set attributes as numeric value
+        root.join("test-file.txt").setAttributes(octal!660);
+
+        // Test that no group users can write the file
+        root.join("test-file.txt").hasAttributes(octal!660).should.be(true);
+
+        // Test that others do not have any access to the file
+        root.join("test-file.txt").hasAttributes(octal!104).should.be(false);
+        root.join("test-file.txt").hasAttributes(octal!106).should.be(false);
+        root.join("test-file.txt").hasAttributes(octal!107).should.be(false);
+        root.join("test-file.txt").hasAttributes(S_IWOTH).should.be(false);
+        root.join("test-file.txt").hasAttributes(S_IROTH).should.be(false);
+        root.join("test-file.txt").hasAttributes(S_IXOTH).should.be(false);
+    }
+
 
     // TODO: to add:
     //       - match pattern
