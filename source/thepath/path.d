@@ -1,119 +1,23 @@
-/// ThePath - easy way to work with paths and files
-module thepath;
+/// This module defines Path - the main structure that represent's highlevel interface to paths
+module thepath.path;
 
 static public import std.file: SpanMode;
 static private import std.path;
 static private import std.file;
 static private import std.stdio;
+static private import std.process;
 private import std.path: expandTilde;
 private import std.format: format;
 private import std.exception: enforce;
-
-
-/** Create temporary directory
-  * Note, that caller is responsible to remove created directory.
-  * The temp directory will be created inside specified path.
-  * 
-  * Params:
-  *     path = path to already existing directory to create
-  *         temp directory inside. Default: std.file.tempDir
-  *     prefix = prefix to be used in name of temp directory. Default: "tmp"
-  * Returns: string, representing path to created temporary directory
-  * Throws: PathException in case of error
-  **/
-string createTempDirectory(in string prefix="tmp") {
-    import std.file : tempDir;
-    return createTempDirectory(tempDir, prefix);
-}
-
-/// ditto
-string createTempDirectory(in string path, in string prefix) {
-    version(Posix) {
-        import std.string : fromStringz;
-        import std.conv: to;
-        import core.sys.posix.stdlib : mkdtemp;
-
-        // Prepare template for mkdtemp function.
-        // It have to be mutable array of chars ended with zero to be compatibale
-        // with mkdtemp function.
-        scope char[] tempname_str = std.path.buildNormalizedPath(
-            std.path.expandTilde(path),
-            prefix ~ "-XXXXXX").dup ~ "\0";
-
-        // mkdtemp will modify tempname_str directly. and res is pointer to
-        // tempname_str in case of success.
-        char* res = mkdtemp(tempname_str.ptr);
-        enforce!PathException(
-            res !is null, "Cannot create temporary directory");
-
-        // Converting to string will duplicate result.
-        // But may be it have sense to do it in more obvious way
-        // for example: return tempname_str[0..$-1].idup;
-        return to!string(res.fromStringz);
-    } else {
-        import std.ascii: letters;
-        import std.random: uniform;
-
-        // Generate new random temp path to test using provided path and prefix
-        // as template.
-        string generate_temp_dir() {
-            string suffix = "-";
-            for(ubyte i; i<6; i++) suffix ~= letters[uniform(0, $)];
-            return std.path.buildNormalizedPath(
-                std.path.expandTilde(path), prefix ~ suffix);
-        }
-
-        string temp_dir = generate_temp_dir();
-        while (std.file.exists(temp_dir)) {
-            temp_dir = generate_temp_dir();
-        }
-        std.file.mkdir(temp_dir);
-        return temp_dir;
-    }
-}
-
-
-/** Create temporary directory
-  * Note, that caller is responsible to remove created directory.
-  * The temp directory will be created inside specified path.
-  *
-  * Params:
-  *     path = path to already existing directory to create
-  *         temp directory inside. Default: std.file.tempDir
-  *     prefix = prefix to be used in name of temp directory. Default: "tmp"
-  * Returns: Path to created temp directory
-  * Throws: PathException in case of error
-  **/
-Path createTempPath(in string prefix="tmp") {
-    return Path(createTempDirectory(prefix));
-}
-
-/// ditto
-Path createTempPath(in string path, in string prefix) {
-    return Path(createTempDirectory(path, prefix));
-}
-
-/// ditto
-Path createTempPath(in Path path, in string prefix) {
-    return createTempPath(path.toString, prefix);
-}
-
-
-/// PathException - will be raise on failure on path (or file) operations
-class PathException : Exception {
-
-    /// Main constructor
-    this(string msg, string file = __FILE__, size_t line = __LINE__) {
-        super(msg, file, line);
-    }
-}
+private import thepath.utils: createTempPath, createTempDirectory;
+private import thepath.exception: PathException;
 
 
 /** Main struct to work with paths.
   **/
 struct Path {
     // TODO: Deside if we need to make _path by default configured to current directory or to allow path to be null
-    private string _path=".";
+    private string _path=null;
 
     /** Main constructor to build new Path from string
       * Params:
@@ -141,6 +45,26 @@ struct Path {
         }
     }
 
+    /** Check if path is null
+      * Returns: true if this path is null (not set)
+      **/
+    bool isNull() const {
+        return _path is null;
+    }
+
+    ///
+    unittest {
+        import dshould;
+
+        Path().isNull.should.be(true);
+        Path(".").isNull.should.be(false);
+        Path("some-path").isNull.should.be(false);
+
+        Path default_path;
+
+        default_path.isNull.should.be(true);
+    }
+
     /** Check if path is valid.
       * Returns: true if this is valid path.
       **/
@@ -148,9 +72,31 @@ struct Path {
         return std.path.isValidPath(_path);
     }
 
+    ///
+    unittest {
+        import dshould;
+
+        Path().isValid.should.be(false);
+        Path(".").isValid.should.be(true);
+        Path("some-path").isValid.should.be(true);
+    }
+
     /// Check if path is absolute
     bool isAbsolute() const {
         return std.path.isAbsolute(_path);
+    }
+
+    ///
+    unittest {
+        import dshould;
+
+        Path().isValid.should.be(false);
+        Path(".").isAbsolute.should.be(false);
+        Path("some-path").isAbsolute.should.be(false);
+
+        version(Posix) {
+            Path("/test/path").isAbsolute.should.be(true);
+        }
     }
 
     /// Check if path starts at root directory (or drive letter)
@@ -458,7 +404,30 @@ struct Path {
         import std.algorithm.iteration: map;
         return std.file.dirEntries(
             _path, mode, followSymlink).map!(a => Path(a));
+    }
 
+    ///
+    unittest {
+        import dshould;
+        Path root = createTempPath();
+        scope(exit) root.remove();
+
+        // Create sample directory structure
+        root.join("d1", "d2").mkdir(true);
+        root.join("d1", "test1.txt").writeFile("Test 1");
+        root.join("d1", "d2", "test2.txt").writeFile("Test 2");
+
+        // Walk through the derectory d1
+        Path[] result;
+        foreach(p; root.join("d1").walk(SpanMode.breadth)) {
+            result ~= p;
+        }
+
+        result.should.equal([
+            root.join("d1", "d2"),
+            root.join("d1", "d2", "test2.txt"),
+            root.join("d1", "test1.txt"),
+        ]);
     }
 
     /// Change current working directory to this.
@@ -780,7 +749,7 @@ struct Path {
             home_tmp.join("test-dir", "d2").isDir.should.be(true);
             home_tmp.join("test-dir", "d2", "f2.txt").exists.should.be(true);
             home_tmp.join("test-dir", "d2", "f2.txt").isFile.should.be(true);
-        } 
+        }
 
 
 
@@ -1133,6 +1102,7 @@ struct Path {
         return std.file.read(_path.expandTilde, upTo);
     }
 
+    ///
     unittest {
         import dshould;
         Path root = createTempPath();
@@ -1166,9 +1136,260 @@ struct Path {
         rdata[4].should.equal(9);
     }
 
-    // TODO: Add readFileText method
+    /** Read text content of the file.
+      * Technicall just a call to $(REF readText, std, file).
+      *
+      * Params:
+      *     S = template parameter that represents type of string to read
+      * Returns:
+      *     text read from file.
+      * Throws:
+      *     $(LREF FileException) if there is an error reading the file,
+      *     $(REF UTFException, std, utf) on UTF decoding error.
+      **/
+    auto readFileText(S=string)() const {
+        return std.file.readText!S(_path.expandTilde);
+    }
+
+
+    ///
+    unittest {
+        import dshould;
+        Path root = createTempPath();
+        scope(exit) root.remove();
+
+        // Write some utf-8 data from the file
+        root.join("test-utf-8.txt").writeFile("Hello World");
+
+        // Test that we read correct value
+        root.join("test-utf-8.txt").readFileText.should.equal("Hello World");
+
+        // Write some data in UTF-16 with BOM
+        root.join("test-utf-16.txt").writeFile("\uFEFFhi humans"w);
+
+        // Read utf-16 content
+        auto content = root.join("test-utf-16.txt").readFileText!wstring;
+
+        // Strip BOM if present.
+        import std.algorithm.searching : skipOver;
+        content.skipOver('\uFEFF');
+
+        // Ensure we read correct value
+        content.should.equal("hi humans"w);
+    }
+
+    /** Get attributes of the path
+      *
+      *  Returns:
+      *      uint - represening attributes of the file
+      **/
+    auto getAttributes() const {
+        return std.file.getAttributes(_path.expandTilde);
+    }
+
+    /// Test if file has permission to run
+    version(Posix) unittest {
+        import dshould;
+        import std.conv: octal;
+        Path root = createTempPath();
+        scope(exit) root.remove();
+
+        // Here we have to import bitmasks from system;
+        import core.sys.posix.sys.stat;
+
+        root.join("test-file.txt").writeFile("Hello World!");
+        auto attributes = root.join("test-file.txt").getAttributes();
+
+        // Test that file has permissions 644
+        (attributes & octal!644).should.equal(octal!644);
+
+        // Test that file is readable by user
+        (attributes & S_IRUSR).should.equal(S_IRUSR);
+
+        // Test that file is not writeable by others
+        (attributes & S_IWOTH).should.not.equal(S_IWOTH);
+    }
+
+    /** Check if file has numeric attributes.
+      * This method check if all bits specified by param 'attributes' are set.
+      *
+      * Params:
+      *     attributes = numeric attributes (bit mask) to check
+      *
+      * Returns:
+      *     true if all attributes present on file.
+      *     false if at lease one bit specified by attributes is not set.
+      *
+      **/
+    bool hasAttributes(in uint attributes) const {
+        return (this.getAttributes() & attributes) == attributes;
+
+    }
+
+    /// Example of checking attributes of file.
+    version(Posix) unittest {
+        import dshould;
+        import std.conv: octal;
+        Path root = createTempPath();
+        scope(exit) root.remove();
+
+        // Here we have to import bitmasks from system;
+        import core.sys.posix.sys.stat;
+
+        root.join("test-file.txt").writeFile("Hello World!");
+
+        // Check that file has numeric permissions 644
+        root.join("test-file.txt").hasAttributes(octal!644).should.be(true);
+
+        // Check that it is not 755
+        root.join("test-file.txt").hasAttributes(octal!755).should.be(false);
+
+        // Check that every user can read this file.
+        root.join("test-file.txt").hasAttributes(octal!444).should.be(true);
+
+        // Check that owner can read the file
+        // (do not check access rights for group and others)
+        root.join("test-file.txt").hasAttributes(octal!400).should.be(true);
+
+        // Test that file is readable by user
+        root.join("test-file.txt").hasAttributes(S_IRUSR).should.be(true);
+
+        // Test that file is writable by user
+        root.join("test-file.txt").hasAttributes(S_IWUSR).should.be(true);
+
+        // Test that file is not writable by others
+        root.join("test-file.txt").hasAttributes(S_IWOTH).should.be(false);
+    }
+
+    /** Set attributes of the path
+      *
+      *  Params:
+      *      attributes = value representing attributes to set on path.
+     **/
+
+    void setAttributes(in uint attributes) const {
+        std.file.setAttributes(_path, attributes);
+    }
+
+    /// Example of changing attributes of file.
+    version(Posix) unittest {
+        import dshould;
+        import std.conv: octal;
+        Path root = createTempPath();
+        scope(exit) root.remove();
+
+        // Here we have to import bitmasks from system;
+        import core.sys.posix.sys.stat;
+
+        root.join("test-file.txt").writeFile("Hello World!");
+
+        // Check that file has numeric permissions 644
+        root.join("test-file.txt").hasAttributes(octal!644).should.be(true);
+
+
+        auto attributes = root.join("test-file.txt").getAttributes();
+
+        // Test that file is readable by user
+        (attributes & S_IRUSR).should.equal(S_IRUSR);
+
+        // Test that file is not writeable by others
+        (attributes & S_IWOTH).should.not.equal(S_IWOTH);
+
+        // Add right to write file by others
+        root.join("test-file.txt").setAttributes(attributes | S_IWOTH);
+
+        // Test that file is now writable by others
+        root.join("test-file.txt").hasAttributes(S_IWOTH).should.be(true);
+
+        // Test that numeric permissions changed
+        root.join("test-file.txt").hasAttributes(octal!646).should.be(true);
+
+        // Set attributes as numeric value
+        root.join("test-file.txt").setAttributes(octal!660);
+
+        // Test that no group users can write the file
+        root.join("test-file.txt").hasAttributes(octal!660).should.be(true);
+
+        // Test that others do not have any access to the file
+        root.join("test-file.txt").hasAttributes(octal!104).should.be(false);
+        root.join("test-file.txt").hasAttributes(octal!106).should.be(false);
+        root.join("test-file.txt").hasAttributes(octal!107).should.be(false);
+        root.join("test-file.txt").hasAttributes(S_IWOTH).should.be(false);
+        root.join("test-file.txt").hasAttributes(S_IROTH).should.be(false);
+        root.join("test-file.txt").hasAttributes(S_IXOTH).should.be(false);
+    }
+
+    /** Execute the file pointed by path
+      *
+      * Params:
+      *     args = arguments to be passed to program
+      *     env = associative array that represent environment variables
+      *        to be passed to program pointed by path
+      *     workDir = Working directory for new process.
+      *     config = Parameters for process creation.
+      *        See See $(REF Config, std, process)
+      *     maxOutput = Max bytes of output to be captured
+      * Returns:
+      *     An $(D std.typecons.Tuple!(int, "status", string, "output")).
+     **/
+    auto execute(P=string)(in string[] args=[],
+            in string[string] env=null,
+            in P workDir=null,
+            in std.process.Config config=std.process.Config.none,
+            in size_t maxOutput=size_t.max) const
+    if (is(P == string)) {
+        return std.process.execute(
+            this._path ~ args, env, config, maxOutput, workDir);
+    }
+
+    /// ditto
+    auto execute(P=string)(in string[] args=[],
+            in string[string] env=null,
+            in P workDir=null,
+            in std.process.Config config=std.process.Config.none,
+            in size_t maxOutput=size_t.max) const
+    if (is(P == Path)) {
+        return std.process.execute(
+            this._path ~ args, env, config, maxOutput, workDir.toString);
+    }
+
+
+    ///
+    version(Posix) unittest {
+        import dshould;
+        import std.conv: octal;
+        Path root = createTempPath();
+        scope(exit) root.remove();
+
+        // Create simple test script that will print its arguments
+        root.join("test-script").writeFile(
+            "#!/usr/bin/env bash\necho \"$@\";");
+
+        // Add permission to run this script
+        root.join("test-script").setAttributes(octal!755);
+
+        // Run test script without args
+        auto status1 = root.join("test-script").execute;
+        status1.status.should.be(0);
+        status1.output.should.equal("\n");
+
+        auto status2 = root.join("test-script").execute(["hello", "world"]);
+        status2.status.should.be(0);
+        status2.output.should.equal("hello world\n");
+
+        auto status3 = root.join("test-script").execute(["hello", "world\nplus"]);
+        status3.status.should.be(0);
+        status3.output.should.equal("hello world\nplus\n");
+
+        auto status4 = root.join("test-script").execute(
+                ["hello", "world"],
+                null,
+                root);
+        status4.status.should.be(0);
+        status4.output.should.equal("hello world\n");
+    }
+
     // TODO: to add:
     //       - match pattern
     //       - Handle symlinks
-    //       - Add readFileText
 }

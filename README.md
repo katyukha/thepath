@@ -12,8 +12,7 @@ Following ideas used in this project
 - Implement struct or class `Path` that have to represent
   single path to file or directory.
 - Any operation on path have to create new instance of `Path`,
-  thus no implicit modification of Path allowed
-  to avoid side effects
+  thus no implicit modification of Path allowed to avoid side effects.
 - Simplify naming for frequent operations
   (introducing new type for this allows to do it without name collisions).
 - Automatic tilde expansion when needed (for example before file operations),
@@ -28,7 +27,7 @@ import thepath;
 
 
 Path app_dir = Path("~/.local/my-app");
-Path catalog_dir = app_dir.join('catalog');
+Path catalog_dir = app_dir.join("catalog");
 
 
 void init() {
@@ -42,7 +41,7 @@ void init() {
 
 void list_dir {
     fopeach(Path p; catalog_dir.walk(SpanModel.breadth)) {
-        writeln(p.expandTilde.toAbsolute().toString());
+        writeln(p.toAbsolute().toString());
     }
 }
 ```
