@@ -5,7 +5,7 @@ static public import std.file: SpanMode;
 static private import std.path;
 static private import std.file;
 static private import std.stdio;
-private static import std.process;
+static private import std.process;
 private import std.path: expandTilde;
 private import std.format: format;
 private import std.exception: enforce;
@@ -17,7 +17,7 @@ private import thepath.exception: PathException;
   **/
 struct Path {
     // TODO: Deside if we need to make _path by default configured to current directory or to allow path to be null
-    private string _path=null; //".";
+    private string _path=null;
 
     /** Main constructor to build new Path from string
       * Params:
@@ -1124,7 +1124,7 @@ struct Path {
       *     $(LREF FileException) if there is an error reading the file,
       *     $(REF UTFException, std, utf) on UTF decoding error.
       **/
-    auto readFileText(S=string)() {
+    auto readFileText(S=string)() const {
         return std.file.readText!S(_path.expandTilde);
     }
 
@@ -1160,7 +1160,7 @@ struct Path {
       *  Returns:
       *      uint - represening attributes of the file
       **/
-    auto getAttributes() {
+    auto getAttributes() const {
         return std.file.getAttributes(_path.expandTilde);
     }
 
@@ -1198,7 +1198,7 @@ struct Path {
       *     false if at lease one bit specified by attributes is not set.
       *
       **/
-    bool hasAttributes(in uint attributes) {
+    bool hasAttributes(in uint attributes) const {
         return (this.getAttributes() & attributes) == attributes;
 
     }
@@ -1244,7 +1244,7 @@ struct Path {
       *      attributes = value representing attributes to set on path.
      **/
 
-    void setAttributes(in uint attributes) {
+    void setAttributes(in uint attributes) const {
         std.file.setAttributes(_path, attributes);
     }
 
@@ -1297,23 +1297,23 @@ struct Path {
     }
 
     /** Execute the file pointed by path
-
-        Params:
-            args = arguments to be passed to program
-            env = associative array that represent environment variables
-               to be passed to program pointed by path
-            workDir = Working directory for new process.
-            config = Parameters for process creation.
-               See See $(REF Config, std, process)
-            maxOutput = Max bytes of output to be captured
-        Returns:
-            An $(D std.typecons.Tuple!(int, "status", string, "output")).
+      *
+      * Params:
+      *     args = arguments to be passed to program
+      *     env = associative array that represent environment variables
+      *        to be passed to program pointed by path
+      *     workDir = Working directory for new process.
+      *     config = Parameters for process creation.
+      *        See See $(REF Config, std, process)
+      *     maxOutput = Max bytes of output to be captured
+      * Returns:
+      *     An $(D std.typecons.Tuple!(int, "status", string, "output")).
      **/
     auto execute(P=string)(in string[] args=[],
             in string[string] env=null,
             in P workDir=null,
-            std.process.Config config=std.process.Config.none,
-            size_t maxOutput=size_t.max)
+            in std.process.Config config=std.process.Config.none,
+            in size_t maxOutput=size_t.max) const
     if (is(P == string)) {
         return std.process.execute(
             this._path ~ args, env, config, maxOutput, workDir);
@@ -1323,8 +1323,8 @@ struct Path {
     auto execute(P=string)(in string[] args=[],
             in string[string] env=null,
             in P workDir=null,
-            std.process.Config config=std.process.Config.none,
-            size_t maxOutput=size_t.max)
+            in std.process.Config config=std.process.Config.none,
+            in size_t maxOutput=size_t.max) const
     if (is(P == Path)) {
         return std.process.execute(
             this._path ~ args, env, config, maxOutput, workDir.toString);
