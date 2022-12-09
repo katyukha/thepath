@@ -16,7 +16,6 @@ private import thepath.exception: PathException;
 /** Main struct to work with paths.
   **/
 struct Path {
-    // TODO: Deside if we need to make _path by default configured to current directory or to allow path to be null
     private string _path=null;
 
     /** Main constructor to build new Path from string
@@ -117,6 +116,29 @@ struct Path {
     /// Determine if path is symlink
     bool isSymlink() const {
         return std.file.isSymlink(_path.expandTilde);
+    }
+
+    /// Return current path (as absolute path)
+    static Path current() {
+        return Path(".").toAbsolute;
+    }
+
+    ///
+    unittest {
+        import dshould;
+        Path root = createTempPath();
+        scope(exit) root.remove();
+
+        // Save current directory
+        auto cdir = std.file.getcwd;
+        scope(exit) std.file.chdir(cdir);
+
+        // Create directory structure
+        root.join("dir1", "dir2", "dir3").mkdir(true);
+        root.join("dir1", "dir2", "dir3").chdir;
+
+        // Check that current path is equal to dir1/dir2/dir3 (current dir)
+        Path.current.toString.should.equal(root.join("dir1", "dir2", "dir3").toString);
     }
 
     /// Check if path exists
@@ -990,6 +1012,38 @@ struct Path {
         root.join("test-dir", "subdir").exists.should.be(true);
     }
 
+    /** Create symlink for this file in dest path.
+      *
+      * Params:
+      *     dest = Destination path.
+      *
+      * Throws:
+      *     FileException
+      **/
+    version(Posix) void symlink(in Path dest) {
+        std.file.symlink(_path, dest._path);
+    }
+
+    ///
+    version(Posix) unittest {
+        import dshould;
+        Path root = createTempPath();
+        scope(exit) root.remove();
+
+        // Create a file in some directory
+        root.join("test-dir", "subdir").mkdir(true);
+        root.join("test-dir", "subdir", "test-file.txt").writeFile("Hello!");
+
+        // Create a symlink for created file
+        root.join("test-dir", "subdir", "test-file.txt").symlink(
+            root.join("test-symlink.txt"));
+
+        // Test that symlink was created
+        root.join("test-symlink.txt").exists.should.be(true);
+        root.join("test-symlink.txt").isSymlink.should.be(true);
+        root.join("test-symlink.txt").readFile.should.equal("Hello!");
+    }
+
     /** Open file and return `std.stdio.File` struct with opened file
       * Params:
       *     openMode = string representing open mode with
@@ -1389,7 +1443,84 @@ struct Path {
         status4.output.should.equal("hello world\n");
     }
 
+    /** Search file by name in current directory and parent directories.
+      * Usually, this could be used to find project config,
+      * when current directory is somewhere inside project.
+      *
+      * If no file with specified name found, then return null path.
+      *
+      * Params:
+      *     file_name = Name of file to search
+      * Returns:
+      *     Path to searched file, if such file was found.
+      *     Otherwise return null Path.
+     **/
+    version(Posix) Path searchFileUp(in string file_name) const {
+        return searchFileUp(Path(file_name));
+    }
+
+    /// ditto
+    version(Posix) Path searchFileUp(in Path search_path) const {
+        Path current_path = toAbsolute;
+        while (current_path._path != "/") {
+            auto dst_path = current_path.join(search_path);
+            if (dst_path.exists && dst_path.isFile) {
+                return dst_path;
+            }
+            current_path = current_path.parent;
+
+            if (current_path._path == current_path.parent._path)
+                // It seem that if current path is same as parent path,
+                // then it could be infinite loop. So, let's break the loop;
+                break;
+        }
+        // Return empty path, that means - no path found
+        return Path();
+    }
+
+
+    /** Example of searching configuration file, when you are somewhere inside
+      * project.
+      **/
+    version(Posix) unittest {
+        import dshould;
+        Path root = createTempPath();
+        scope(exit) root.remove();
+
+        // Save current directory
+        auto cdir = std.file.getcwd;
+        scope(exit) std.file.chdir(cdir);
+
+        // Create directory structure
+        root.join("dir1", "dir2", "dir3").mkdir(true);
+        root.join("dir1", "my-conf.conf").writeFile("hello!");
+        root.join("dir1", "dir4", "dir8").mkdir(true);
+        root.join("dir1", "dir4", "my-conf.conf").writeFile("Hi!");
+        root.join("dir1", "dir5", "dir6", "dir7").mkdir(true);
+
+        // Change current working directory to dir7
+        root.join("dir1", "dir5", "dir6", "dir7").chdir;
+
+        // Find config file. It sould be dir1/my-conf.conf
+        Path.current.searchFileUp("my-conf.conf").toString.should.equal(
+            root.join("dir1", "my-conf.conf").toAbsolute.toString);
+
+        // Try to get config, related to "dir8"
+        root.join("dir1", "dir4", "dir8").searchFileUp(
+            "my-conf.conf").should.equal(
+                root.join("dir1", "dir4", "my-conf.conf"));
+
+        // One more test
+        root.join("dir1", "dir2", "dir3").searchFileUp(
+            Path("dir4", "my-conf.conf")).should.equal(
+                root.join("dir1", "dir4", "my-conf.conf"));
+        root.join("dir1", "dir2", "dir3").searchFileUp(
+            "my-conf.conf").should.equal(root.join("dir1", "my-conf.conf"));
+    }
+
     // TODO: to add:
+    //       - Override comparing operators
+    //       - Override operators join paths
+    //       - Implement alias this feature to make it easily convertible to string.
     //       - match pattern
-    //       - Handle symlinks
 }

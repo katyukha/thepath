@@ -19,6 +19,13 @@ Following ideas used in this project
   thus allowing to easily work with patth like `~/my/path`
   without any special work needed.
 
+**Warning**: Currently this lib is not tested on Windows or other platforms.
+So, it surelly works on Posix (linux only), but possibly,
+it should work on other platforms too.
+If you want to help to make it crossplatform, then contact me (
+the first thing needed to make it cross platform, is to set up CI to run
+automated tests on other platforms).
+
 
 ## Examples
 
