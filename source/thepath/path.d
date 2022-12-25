@@ -6,6 +6,7 @@ static private import std.path;
 static private import std.file;
 static private import std.stdio;
 static private import std.process;
+private import std.typecons: Nullable, nullable;
 private import std.path: expandTilde;
 private import std.format: format;
 private import std.exception: enforce;
@@ -14,6 +15,10 @@ private import thepath.exception: PathException;
 
 
 /** Main struct to work with paths.
+  *
+  * Later will be changed soon:
+  * - By default, path is initialized as null.
+  * - This could be checked with .isNull method.
   **/
 struct Path {
     private string _path=null;
@@ -47,7 +52,7 @@ struct Path {
     /** Check if path is null
       * Returns: true if this path is null (not set)
       **/
-    bool isNull() const {
+    deprecated bool isNull() const {
         return _path is null;
     }
 
@@ -1455,17 +1460,17 @@ struct Path {
       *     Path to searched file, if such file was found.
       *     Otherwise return null Path.
      **/
-    version(Posix) Path searchFileUp(in string file_name) const {
+    version(Posix) Nullable!Path searchFileUp(in string file_name) const {
         return searchFileUp(Path(file_name));
     }
 
     /// ditto
-    version(Posix) Path searchFileUp(in Path search_path) const {
+    version(Posix) Nullable!Path searchFileUp(in Path search_path) const {
         Path current_path = toAbsolute;
         while (current_path._path != "/") {
             auto dst_path = current_path.join(search_path);
             if (dst_path.exists && dst_path.isFile) {
-                return dst_path;
+                return dst_path.nullable;
             }
             current_path = current_path.parent;
 
@@ -1474,8 +1479,8 @@ struct Path {
                 // then it could be infinite loop. So, let's break the loop;
                 break;
         }
-        // Return empty path, that means - no path found
-        return Path();
+        // Return null, that means - no path found
+        return Nullable!Path.init;
     }
 
 
@@ -1502,20 +1507,38 @@ struct Path {
         root.join("dir1", "dir5", "dir6", "dir7").chdir;
 
         // Find config file. It sould be dir1/my-conf.conf
-        Path.current.searchFileUp("my-conf.conf").toString.should.equal(
+        auto p1 = Path.current.searchFileUp("my-conf.conf");
+        p1.isNull.should.be(false);
+        p1.get.toString.should.equal(
             root.join("dir1", "my-conf.conf").toAbsolute.toString);
 
         // Try to get config, related to "dir8"
-        root.join("dir1", "dir4", "dir8").searchFileUp(
-            "my-conf.conf").should.equal(
+        auto p2 = root.join("dir1", "dir4", "dir8").searchFileUp(
+            "my-conf.conf");
+        p2.isNull.should.be(false);
+        p2.get.should.equal(
+                root.join("dir1", "dir4", "my-conf.conf"));
+
+        // Test searching for some path (instead of simple file/string)
+        auto p3 = root.join("dir1", "dir2", "dir3").searchFileUp(
+            Path("dir4", "my-conf.conf"));
+        p3.isNull.should.be(false);
+        p3.get.should.equal(
                 root.join("dir1", "dir4", "my-conf.conf"));
 
         // One more test
-        root.join("dir1", "dir2", "dir3").searchFileUp(
-            Path("dir4", "my-conf.conf")).should.equal(
-                root.join("dir1", "dir4", "my-conf.conf"));
-        root.join("dir1", "dir2", "dir3").searchFileUp(
-            "my-conf.conf").should.equal(root.join("dir1", "my-conf.conf"));
+        auto p4 = root.join("dir1", "dir2", "dir3").searchFileUp(
+            "my-conf.conf");
+        p4.isNull.should.be(false);
+        p4.get.should.equal(root.join("dir1", "my-conf.conf"));
+
+        // Try to find up some unexisting file
+        auto p5 = root.join("dir1", "dir2", "dir3").searchFileUp(
+            "i-am-not-exist.conf");
+        p5.isNull.should.be(true);
+
+        import core.exception: AssertError;
+        p5.get.should.throwA!AssertError;
     }
 
     // TODO: to add:
