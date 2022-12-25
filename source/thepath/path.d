@@ -1400,6 +1400,15 @@ struct Path {
             (workDir.isNull) ? null : workDir.get.toString);
     }
 
+    /// ditto
+    auto execute(in string[] args,
+            in string[string] env,
+            in Path workDir,
+            in std.process.Config config=std.process.Config.none,
+            in size_t maxOutput=size_t.max) const {
+        return execute(args, env, cast(const Nullable!Path)workDir.nullable, config, maxOutput);
+    }
+
 
     /// Example of running execute to run simple script
     version(Posix) unittest {
@@ -1483,6 +1492,15 @@ struct Path {
                 Nullable!Path.init);
         status2.status.should.be(0);
         status2.output.should.equal(root.toString ~ "\n");
+
+        // Passs my-dir as workding directory for script (without nullable)
+        auto status3 = root.join("test-script").execute(
+                ["hello", "world"],
+                null,
+                my_dir);
+        status3.status.should.be(0);
+        status3.output.should.equal(my_dir.toString ~ "\n");
+
     }
 
     /** Search file by name in current directory and parent directories.
