@@ -1387,29 +1387,21 @@ struct Path {
       * Returns:
       *     An $(D std.typecons.Tuple!(int, "status", string, "output")).
      **/
-    auto execute(P=string)(in string[] args=[],
+    auto execute(in string[] args=[],
             in string[string] env=null,
-            in P workDir=null,
+            in Nullable!Path workDir=Nullable!Path.init,
             in std.process.Config config=std.process.Config.none,
-            in size_t maxOutput=size_t.max) const
-    if (is(P == string)) {
+            in size_t maxOutput=size_t.max) const {
         return std.process.execute(
-            this._path ~ args, env, config, maxOutput, workDir);
-    }
-
-    /// ditto
-    auto execute(P=string)(in string[] args=[],
-            in string[string] env=null,
-            in P workDir=null,
-            in std.process.Config config=std.process.Config.none,
-            in size_t maxOutput=size_t.max) const
-    if (is(P == Path)) {
-        return std.process.execute(
-            this._path ~ args, env, config, maxOutput, workDir.toString);
+            this._path ~ args,
+            env,
+            config,
+            maxOutput,
+            (workDir.isNull) ? null : workDir.get.toString);
     }
 
 
-    ///
+    /// Example of running execute to run simple script
     version(Posix) unittest {
         import dshould;
         import std.conv: octal;
@@ -1439,9 +1431,58 @@ struct Path {
         auto status4 = root.join("test-script").execute(
                 ["hello", "world"],
                 null,
-                root);
+                root.nullable);
         status4.status.should.be(0);
         status4.output.should.equal("hello world\n");
+    }
+
+    /// Example of running execute to run script that will print
+    /// current working directory
+    version(Posix) unittest {
+        import dshould;
+        import std.conv: octal;
+
+        Path current = Path.current;
+        scope(exit) current.chdir;
+
+        Path root = createTempPath();
+        scope(exit) root.remove();
+
+        // Create simple test script that will print its arguments
+        root.join("test-script").writeFile(
+            "#!/usr/bin/env bash\npwd;");
+
+        // Add permission to run this script
+        root.join("test-script").setAttributes(octal!755);
+
+        // Change current working directory to our root;
+        root.chdir;
+
+        // Do not pass current working directory
+        // (script have to print current working directory)
+        auto status0 = root.join("test-script").execute(["hello", "world"]);
+        status0.status.should.be(0);
+        status0.output.should.equal(root.toString ~ "\n");
+
+        // Create some other directory
+        auto my_dir = root.join("my-dir");
+        my_dir.mkdir();
+
+        // Passs my-dir as workding directory for script
+        auto status1 = root.join("test-script").execute(
+                ["hello", "world"],
+                null,
+                my_dir.nullable);
+        status1.status.should.be(0);
+        status1.output.should.equal(my_dir.toString ~ "\n");
+
+        // Passs null path as workding direcotry for script
+        auto status2 = root.join("test-script").execute(
+                ["hello", "world"],
+                null,
+                Nullable!Path.init);
+        status2.status.should.be(0);
+        status2.output.should.equal(root.toString ~ "\n");
     }
 
     /** Search file by name in current directory and parent directories.
