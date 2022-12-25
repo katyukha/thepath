@@ -15,13 +15,9 @@ private import thepath.exception: PathException;
 
 
 /** Main struct to work with paths.
-  *
-  * Later will be changed soon:
-  * - By default, path is initialized as null.
-  * - This could be checked with .isNull method.
   **/
 struct Path {
-    private string _path=null;
+    private string _path;
 
     /** Main constructor to build new Path from string
       * Params:
@@ -49,24 +45,9 @@ struct Path {
         }
     }
 
-    /** Check if path is null
-      * Returns: true if this path is null (not set)
-      **/
-    deprecated bool isNull() const {
-        return _path is null;
-    }
-
-    ///
-    unittest {
-        import dshould;
-
-        Path().isNull.should.be(true);
-        Path(".").isNull.should.be(false);
-        Path("some-path").isNull.should.be(false);
-
-        Path default_path;
-
-        default_path.isNull.should.be(true);
+    invariant {
+        // TODO: Possibly, we have to check path validity here too.
+        assert(_path !is null, "Attempt to use uninitialized path!");
     }
 
     /** Check if path is valid.
@@ -80,7 +61,7 @@ struct Path {
     unittest {
         import dshould;
 
-        Path().isValid.should.be(false);
+        Path("").isValid.should.be(false);
         Path(".").isValid.should.be(true);
         Path("some-path").isValid.should.be(true);
     }
@@ -94,7 +75,7 @@ struct Path {
     unittest {
         import dshould;
 
-        Path().isValid.should.be(false);
+        Path("").isAbsolute.should.be(false);
         Path(".").isAbsolute.should.be(false);
         Path("some-path").isAbsolute.should.be(false);
 
@@ -106,6 +87,20 @@ struct Path {
     /// Check if path starts at root directory (or drive letter)
     bool isRooted() const {
         return std.path.isRooted(_path);
+    }
+
+    /** Split path on segments.
+      * Under the hood, this method uses $(REF pathSplitter, std, path)
+      **/
+    auto segments() const {
+        return std.path.pathSplitter(_path);
+    }
+
+    ///
+    unittest {
+        import dshould;
+
+        Path("t1", "t2", "t3").segments.should.equal(["t1", "t2", "t3"]);
     }
 
     /// Determine if path is file.
@@ -568,6 +563,7 @@ struct Path {
     /** Copy file or directory to destination
       * If source is a file, then copyFileTo will be use to copy it.
       * If source is a directory, then more complex logic will be applied:
+      *
       *     - if dest already exists and it is not dir, then exception will be raised.
       *     - if dest already exists and it is dir, then source dir will be copied inseide that dir with it's name
       *     - if dest does not exists, then current directory will be copied to dest path.
@@ -1546,4 +1542,56 @@ struct Path {
     //       - Override operators join paths
     //       - Implement alias this feature to make it easily convertible to string.
     //       - match pattern
+}
+
+
+/// Example of using nullable paths as function parameters
+unittest {
+    import dshould;
+
+    /* simple function, that will join 'test.conf' to provided path
+     * if provided path is not null, and return null path is provided path
+     * is null
+     */
+    Nullable!Path test_path_fn(in Nullable!Path p) {
+        if (p.isNull)
+            return Nullable!Path.init;
+        return p.get.join("test.conf").nullable;
+    }
+
+    // Pass value to nullable param
+    auto p1 = test_path_fn(Path("hello").nullable);
+    p1.isNull.should.be(false);
+    p1.get.segments.should.equal(["hello", "test.conf"]);
+
+    // Pass null to nullable param
+    auto p2 = test_path_fn(Nullable!Path.init);
+    p1.isNull.should.be(false);
+}
+
+
+/// Example of using paths in structs
+unittest {
+    import dshould;
+
+    struct PStruct {
+        string name;
+        Path path;
+
+        bool check() const {
+            return path.exists;
+        }
+    }
+
+    PStruct p;
+
+    p.name = "test";
+
+    // Attempt to run operation on uninitialized path will throw error
+    import core.exception: AssertError;
+    p.check.should.throwA!AssertError;
+
+    // Let's initialize path and check it again
+    p.path = Path("some-unexisting-path-to-magic-file");
+    p.check.should.be(false);
 }
