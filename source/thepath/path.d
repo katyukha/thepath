@@ -30,7 +30,7 @@ struct Path {
     /** Constructor that allows to build path from segments
       * Params:
       *     segments = array of segments to build path from
-     **/
+      **/
     this(in string[] segments...) {
         _path = std.path.buildNormalizedPath(segments);
     }
@@ -1386,7 +1386,7 @@ struct Path {
       *     maxOutput = Max bytes of output to be captured
       * Returns:
       *     An $(D std.typecons.Tuple!(int, "status", string, "output")).
-     **/
+      **/
     auto execute(in string[] args=[],
             in string[string] env=null,
             in Nullable!Path workDir=Nullable!Path.init,
@@ -1514,7 +1514,7 @@ struct Path {
       * Returns:
       *     Path to searched file, if such file was found.
       *     Otherwise return null Path.
-     **/
+      **/
     version(Posix) Nullable!Path searchFileUp(in string file_name) const {
         return searchFileUp(Path(file_name));
     }
