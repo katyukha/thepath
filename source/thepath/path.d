@@ -6,6 +6,8 @@ static private import std.path;
 static private import std.file;
 static private import std.stdio;
 static private import std.process;
+static private import std.algorithm;
+private import std.typecons: Nullable, nullable;
 private import std.path: expandTilde;
 private import std.format: format;
 private import std.exception: enforce;
@@ -16,7 +18,7 @@ private import thepath.exception: PathException;
 /** Main struct to work with paths.
   **/
 struct Path {
-    private string _path=null;
+    private string _path;
 
     /** Main constructor to build new Path from string
       * Params:
@@ -29,7 +31,7 @@ struct Path {
     /** Constructor that allows to build path from segments
       * Params:
       *     segments = array of segments to build path from
-     **/
+      **/
     this(in string[] segments...) {
         _path = std.path.buildNormalizedPath(segments);
     }
@@ -44,24 +46,9 @@ struct Path {
         }
     }
 
-    /** Check if path is null
-      * Returns: true if this path is null (not set)
-      **/
-    bool isNull() const {
-        return _path is null;
-    }
-
-    ///
-    unittest {
-        import dshould;
-
-        Path().isNull.should.be(true);
-        Path(".").isNull.should.be(false);
-        Path("some-path").isNull.should.be(false);
-
-        Path default_path;
-
-        default_path.isNull.should.be(true);
+    invariant {
+        // TODO: Possibly, we have to check path validity here too.
+        assert(_path !is null, "Attempt to use uninitialized path!");
     }
 
     /** Check if path is valid.
@@ -75,7 +62,7 @@ struct Path {
     unittest {
         import dshould;
 
-        Path().isValid.should.be(false);
+        Path("").isValid.should.be(false);
         Path(".").isValid.should.be(true);
         Path("some-path").isValid.should.be(true);
     }
@@ -89,7 +76,7 @@ struct Path {
     unittest {
         import dshould;
 
-        Path().isValid.should.be(false);
+        Path("").isAbsolute.should.be(false);
         Path(".").isAbsolute.should.be(false);
         Path("some-path").isAbsolute.should.be(false);
 
@@ -101,6 +88,20 @@ struct Path {
     /// Check if path starts at root directory (or drive letter)
     bool isRooted() const {
         return std.path.isRooted(_path);
+    }
+
+    /** Split path on segments.
+      * Under the hood, this method uses $(REF pathSplitter, std, path)
+      **/
+    auto segments() const {
+        return std.path.pathSplitter(_path);
+    }
+
+    ///
+    unittest {
+        import dshould;
+
+        Path("t1", "t2", "t3").segments.should.equal(["t1", "t2", "t3"]);
     }
 
     /// Determine if path is file.
@@ -116,6 +117,99 @@ struct Path {
     /// Determine if path is symlink
     bool isSymlink() const {
         return std.file.isSymlink(_path.expandTilde);
+    }
+
+    /** Override comparison operators to use OS-specific case-sensitivity
+      * rules. They could be used for sorting of path array for example.
+      **/
+	int opCmp(in Path other) const
+	{
+		return std.path.filenameCmp(this._path, other._path);
+	}
+
+	/// ditto
+	int opCmp(in ref Path other) const
+	{
+		return std.path.filenameCmp(this._path, other._path);
+	}
+
+    /// Test comparison operators
+    unittest {
+        import dshould;
+        import std.algorithm: sort;
+        Path[] ap = [
+            Path("a", "d", "c"),
+            Path("a", "c", "e"),
+            Path("g", "a", "d"),
+            Path("ab", "c", "d"),
+        ];
+
+        ap.sort();
+
+        // We just compare segments of paths
+        // (to avoid calling code that have to checked by this test in check itself)
+        ap[0].segments.should.equal(Path("a", "c", "e").segments);
+        ap[1].segments.should.equal(Path("a", "d", "c").segments);
+        ap[2].segments.should.equal(Path("ab", "c", "d").segments);
+        ap[3].segments.should.equal(Path("g", "a", "d").segments);
+
+        ap.sort!("a > b");
+
+        // We just compare segments of paths
+        // (to avoid calling code that have to checked by this test in check itself)
+        ap[0].segments.should.equal(Path("g", "a", "d").segments);
+        ap[1].segments.should.equal(Path("ab", "c", "d").segments);
+        ap[2].segments.should.equal(Path("a", "d", "c").segments);
+        ap[3].segments.should.equal(Path("a", "c", "e").segments);
+
+        // Check simple comparisons
+        Path("a", "d", "g").should.be.greater(Path("a", "b", "c"));
+        Path("g", "d", "r").should.be.less(Path("m", "g", "x"));
+    }
+
+	/** Override equality comparison operators
+      **/
+    bool opEquals(in Path other) const
+	{
+		return opCmp(other) == 0;
+	}
+
+	/// ditto
+	bool opEquals(in ref Path other) const
+	{
+		return opCmp(other) == 0;
+	}
+
+    /// Test equality comparisons
+    unittest {
+        import dshould;
+
+        Path("a", "b").should.equal(Path("a", "b"));
+        Path("a", "b").should.not.equal(Path("a"));
+        Path("a", "b").should.not.equal(Path("a", "b", "c"));
+        Path("a", "b").should.not.equal(Path("a", "c"));
+    }
+
+    /** Compute hash of the Path to be able to use it as key
+      * in asociative arrays.
+      **/
+    size_t toHash() @trusted const nothrow {
+        return typeid(_path).getHash(&_path);
+    }
+
+    ///
+    unittest {
+        import dshould;
+
+        string[Path] arr;
+        arr[Path("my", "path")] = "hello";
+        arr[Path("w", "42")] = "world";
+
+        arr[Path("my", "path")].should.equal("hello");
+        arr[Path("w", "42")].should.equal("world");
+
+        import core.exception: RangeError;
+        arr[Path("x", "124")].should.throwA!RangeError;
     }
 
     /// Return current path (as absolute path)
@@ -457,6 +551,41 @@ struct Path {
         std.file.chdir(_path.expandTilde);
     }
 
+    /** Change current working directory to path inside currect path
+      *
+      * Params:
+      *     sub_path = relative path inside this, to change directory to
+      **/
+    void chdir(in string[] sub_path...) const
+    in {
+        assert(
+            sub_path.length > 0,
+            "at least one path segment have to be provided");
+        assert(
+            !std.path.isAbsolute(sub_path[0]),
+            "sub_path must not be absolute");
+        version(Posix) assert(
+            !std.algorithm.startsWith(sub_path[0], "~"),
+            "sub_path must not start with '~' to " ~
+            "avoid automatic tilde expansion!");
+    } do {
+        this.join(sub_path).chdir();
+    }
+
+    /// ditto
+    void chdir(in Path sub_path) const
+    in {
+        assert(
+            !sub_path.isAbsolute,
+            "sub_path must not be absolute");
+        version(Posix) assert(
+            !std.algorithm.startsWith(sub_path._path, "~"),
+            "sub_path must not start with '~' to " ~
+            "avoid automatic tilde expansion!");
+    } do {
+        this.join(sub_path).chdir();
+    }
+
     ///
     unittest {
         import dshould;
@@ -482,6 +611,39 @@ struct Path {
             Path("~", tmp_dir_name).chdir;
             std.file.getcwd.should.equal(home_tmp._path);
         }
+    }
+
+    ///
+    unittest {
+        import dshould;
+        auto cdir = std.file.getcwd;
+        Path root = createTempPath();
+        scope(exit) {
+            std.file.chdir(cdir);
+            root.remove();
+        }
+
+        // Create some directories
+        root.join("my-dir", "some-dir", "some-sub-dir").mkdir(true);
+        root.join("my-dir", "other-dir").mkdir(true);
+
+        // Check current path is not equal to root
+        Path.current.should.not.equal(root);
+
+        // Change current working directory to test root, and check that it
+        // was changed
+        root.chdir;
+        Path.current.should.equal(root);
+
+        // Try to change current working directory to "my-dir" inside our
+        // test root dir
+        root.chdir("my-dir");
+        Path.current.should.equal(root.join("my-dir"));
+
+        // Try to change current dir to some-sub-dir, and check if it works
+        root.chdir(Path("my-dir", "some-dir", "some-sub-dir"));
+        Path.current.should.equal(
+            root.join("my-dir", "some-dir", "some-sub-dir"));
     }
 
     /** Copy single file to destination.
@@ -563,6 +725,7 @@ struct Path {
     /** Copy file or directory to destination
       * If source is a file, then copyFileTo will be use to copy it.
       * If source is a directory, then more complex logic will be applied:
+      *
       *     - if dest already exists and it is not dir, then exception will be raised.
       *     - if dest already exists and it is dir, then source dir will be copied inseide that dir with it's name
       *     - if dest does not exists, then current directory will be copied to dest path.
@@ -1385,30 +1548,31 @@ struct Path {
       *     maxOutput = Max bytes of output to be captured
       * Returns:
       *     An $(D std.typecons.Tuple!(int, "status", string, "output")).
-     **/
-    auto execute(P=string)(in string[] args=[],
+      **/
+    auto execute(in string[] args=[],
             in string[string] env=null,
-            in P workDir=null,
+            in Nullable!Path workDir=Nullable!Path.init,
             in std.process.Config config=std.process.Config.none,
-            in size_t maxOutput=size_t.max) const
-    if (is(P == string)) {
+            in size_t maxOutput=size_t.max) const {
         return std.process.execute(
-            this._path ~ args, env, config, maxOutput, workDir);
+            this._path ~ args,
+            env,
+            config,
+            maxOutput,
+            (workDir.isNull) ? null : workDir.get.toString);
     }
 
     /// ditto
-    auto execute(P=string)(in string[] args=[],
-            in string[string] env=null,
-            in P workDir=null,
+    auto execute(in string[] args,
+            in string[string] env,
+            in Path workDir,
             in std.process.Config config=std.process.Config.none,
-            in size_t maxOutput=size_t.max) const
-    if (is(P == Path)) {
-        return std.process.execute(
-            this._path ~ args, env, config, maxOutput, workDir.toString);
+            in size_t maxOutput=size_t.max) const {
+        return execute(args, env, cast(const Nullable!Path)workDir.nullable, config, maxOutput);
     }
 
 
-    ///
+    /// Example of running execute to run simple script
     version(Posix) unittest {
         import dshould;
         import std.conv: octal;
@@ -1438,9 +1602,67 @@ struct Path {
         auto status4 = root.join("test-script").execute(
                 ["hello", "world"],
                 null,
-                root);
+                root.nullable);
         status4.status.should.be(0);
         status4.output.should.equal("hello world\n");
+    }
+
+    /// Example of running execute to run script that will print
+    /// current working directory
+    version(Posix) unittest {
+        import dshould;
+        import std.conv: octal;
+
+        const Path current_dir = Path.current;
+        scope(exit) current_dir.chdir;
+
+        Path root = createTempPath();
+        scope(exit) root.remove();
+
+        // Create simple test script that will print its arguments
+        root.join("test-script").writeFile(
+            "#!/usr/bin/env bash\npwd;");
+
+        // Add permission to run this script
+        root.join("test-script").setAttributes(octal!755);
+
+        // Change current working directory to our root;
+        root.chdir;
+
+        // Do not pass current working directory
+        // (script have to print current working directory)
+        auto status0 = root.join("test-script").execute(["hello", "world"]);
+        status0.status.should.be(0);
+        status0.output.should.equal(root.toString ~ "\n");
+
+        // Create some other directory
+        auto my_dir = root.join("my-dir");
+        my_dir.mkdir();
+
+        // Passs my-dir as workding directory for script
+        auto status1 = root.join("test-script").execute(
+                ["hello", "world"],
+                null,
+                my_dir.nullable);
+        status1.status.should.be(0);
+        status1.output.should.equal(my_dir.toString ~ "\n");
+
+        // Passs null path as workding direcotry for script
+        auto status2 = root.join("test-script").execute(
+                ["hello", "world"],
+                null,
+                Nullable!Path.init);
+        status2.status.should.be(0);
+        status2.output.should.equal(root.toString ~ "\n");
+
+        // Passs my-dir as workding directory for script (without nullable)
+        auto status3 = root.join("test-script").execute(
+                ["hello", "world"],
+                null,
+                my_dir);
+        status3.status.should.be(0);
+        status3.output.should.equal(my_dir.toString ~ "\n");
+
     }
 
     /** Search file by name in current directory and parent directories.
@@ -1454,18 +1676,18 @@ struct Path {
       * Returns:
       *     Path to searched file, if such file was found.
       *     Otherwise return null Path.
-     **/
-    version(Posix) Path searchFileUp(in string file_name) const {
+      **/
+    version(Posix) Nullable!Path searchFileUp(in string file_name) const {
         return searchFileUp(Path(file_name));
     }
 
     /// ditto
-    version(Posix) Path searchFileUp(in Path search_path) const {
+    version(Posix) Nullable!Path searchFileUp(in Path search_path) const {
         Path current_path = toAbsolute;
         while (current_path._path != "/") {
             auto dst_path = current_path.join(search_path);
             if (dst_path.exists && dst_path.isFile) {
-                return dst_path;
+                return dst_path.nullable;
             }
             current_path = current_path.parent;
 
@@ -1474,8 +1696,8 @@ struct Path {
                 // then it could be infinite loop. So, let's break the loop;
                 break;
         }
-        // Return empty path, that means - no path found
-        return Path();
+        // Return null, that means - no path found
+        return Nullable!Path.init;
     }
 
 
@@ -1502,25 +1724,38 @@ struct Path {
         root.join("dir1", "dir5", "dir6", "dir7").chdir;
 
         // Find config file. It sould be dir1/my-conf.conf
-        Path.current.searchFileUp("my-conf.conf").toString.should.equal(
+        auto p1 = Path.current.searchFileUp("my-conf.conf");
+        p1.isNull.should.be(false);
+        p1.get.toString.should.equal(
             root.join("dir1", "my-conf.conf").toAbsolute.toString);
 
         // Try to get config, related to "dir8"
-        root.join("dir1", "dir4", "dir8").searchFileUp(
-            "my-conf.conf").should.equal(
+        auto p2 = root.join("dir1", "dir4", "dir8").searchFileUp(
+            "my-conf.conf");
+        p2.isNull.should.be(false);
+        p2.get.should.equal(
+                root.join("dir1", "dir4", "my-conf.conf"));
+
+        // Test searching for some path (instead of simple file/string)
+        auto p3 = root.join("dir1", "dir2", "dir3").searchFileUp(
+            Path("dir4", "my-conf.conf"));
+        p3.isNull.should.be(false);
+        p3.get.should.equal(
                 root.join("dir1", "dir4", "my-conf.conf"));
 
         // One more test
-        root.join("dir1", "dir2", "dir3").searchFileUp(
-            Path("dir4", "my-conf.conf")).should.equal(
-                root.join("dir1", "dir4", "my-conf.conf"));
-        root.join("dir1", "dir2", "dir3").searchFileUp(
-            "my-conf.conf").should.equal(root.join("dir1", "my-conf.conf"));
-    }
+        auto p4 = root.join("dir1", "dir2", "dir3").searchFileUp(
+            "my-conf.conf");
+        p4.isNull.should.be(false);
+        p4.get.should.equal(root.join("dir1", "my-conf.conf"));
 
-    // TODO: to add:
-    //       - Override comparing operators
-    //       - Override operators join paths
-    //       - Implement alias this feature to make it easily convertible to string.
-    //       - match pattern
+        // Try to find up some unexisting file
+        auto p5 = root.join("dir1", "dir2", "dir3").searchFileUp(
+            "i-am-not-exist.conf");
+        p5.isNull.should.be(true);
+
+        import core.exception: AssertError;
+        p5.get.should.throwA!AssertError;
+    }
 }
+
