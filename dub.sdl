@@ -10,5 +10,5 @@ configuration "library" {
 }
 
 configuration "unittest" {
-    dependency "dshould" version="~>1.7.0"
+    dependency "dshould" version="~>1.7.1"
 }
