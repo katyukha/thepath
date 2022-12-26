@@ -21,7 +21,7 @@ unittest {
     scope(exit) root.remove();
 
     // Save current directory
-    auto cdir = Path.current;
+    auto const cdir = Path.current;
     scope(exit) cdir.chdir;
 
     // Create directory structure
@@ -84,13 +84,13 @@ unittest {
     }
 
     // Pass value to nullable param
-    auto p1 = test_path_fn(Path("hello").nullable);
+    auto const p1 = test_path_fn(Path("hello").nullable);
     p1.isNull.should.be(false);
     p1.get.segments.should.equal(["hello", "test.conf"]);
 
     // Pass null to nullable param
-    auto p2 = test_path_fn(Nullable!Path.init);
-    p1.isNull.should.be(false);
+    auto const p2 = test_path_fn(Nullable!Path.init);
+    p2.isNull.should.be(true);
 }
 
 

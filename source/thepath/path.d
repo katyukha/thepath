@@ -169,13 +169,13 @@ struct Path {
 
 	/** Override equality comparison operators
       **/
-    int opEquals(in Path other) const
+    bool opEquals(in Path other) const
 	{
 		return opCmp(other) == 0;
 	}
 
 	/// ditto
-	int opEquals(in ref Path other) const
+	bool opEquals(in ref Path other) const
 	{
 		return opCmp(other) == 0;
 	}
@@ -188,6 +188,28 @@ struct Path {
         Path("a", "b").should.not.equal(Path("a"));
         Path("a", "b").should.not.equal(Path("a", "b", "c"));
         Path("a", "b").should.not.equal(Path("a", "c"));
+    }
+
+    /** Compute hash of the Path to be able to use it as key
+      * in asociative arrays.
+      **/
+    size_t toHash() @trusted const nothrow {
+        return typeid(_path).getHash(&_path);
+    }
+
+    ///
+    unittest {
+        import dshould;
+
+        string[Path] arr;
+        arr[Path("my", "path")] = "hello";
+        arr[Path("w", "42")] = "world";
+
+        arr[Path("my", "path")].should.equal("hello");
+        arr[Path("w", "42")].should.equal("world");
+
+        import core.exception: RangeError;
+        arr[Path("x", "124")].should.throwA!RangeError;
     }
 
     /// Return current path (as absolute path)
@@ -1591,8 +1613,8 @@ struct Path {
         import dshould;
         import std.conv: octal;
 
-        Path current = Path.current;
-        scope(exit) current.chdir;
+        const Path current_dir = Path.current;
+        scope(exit) current_dir.chdir;
 
         Path root = createTempPath();
         scope(exit) root.remove();
