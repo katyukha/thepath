@@ -6,6 +6,7 @@ static private import std.path;
 static private import std.file;
 static private import std.stdio;
 static private import std.process;
+static private import std.algorithm;
 private import std.typecons: Nullable, nullable;
 private import std.path: expandTilde;
 private import std.format: format;
@@ -116,6 +117,77 @@ struct Path {
     /// Determine if path is symlink
     bool isSymlink() const {
         return std.file.isSymlink(_path.expandTilde);
+    }
+
+    /** Override comparison operators to use OS-specific case-sensitivity
+      * rules. They could be used for sorting of path array for example.
+      **/
+	int opCmp(in Path other) const
+	{
+		return std.path.filenameCmp(this._path, other._path);
+	}
+
+	/// ditto
+	int opCmp(in ref Path other) const
+	{
+		return std.path.filenameCmp(this._path, other._path);
+	}
+
+    /// Test comparison operators
+    unittest {
+        import dshould;
+        import std.algorithm: sort;
+        Path[] ap = [
+            Path("a", "d", "c"),
+            Path("a", "c", "e"),
+            Path("g", "a", "d"),
+            Path("ab", "c", "d"),
+        ];
+
+        ap.sort();
+
+        // We just compare segments of paths
+        // (to avoid calling code that have to checked by this test in check itself)
+        ap[0].segments.should.equal(Path("a", "c", "e").segments);
+        ap[1].segments.should.equal(Path("a", "d", "c").segments);
+        ap[2].segments.should.equal(Path("ab", "c", "d").segments);
+        ap[3].segments.should.equal(Path("g", "a", "d").segments);
+
+        ap.sort!("a > b");
+
+        // We just compare segments of paths
+        // (to avoid calling code that have to checked by this test in check itself)
+        ap[0].segments.should.equal(Path("g", "a", "d").segments);
+        ap[1].segments.should.equal(Path("ab", "c", "d").segments);
+        ap[2].segments.should.equal(Path("a", "d", "c").segments);
+        ap[3].segments.should.equal(Path("a", "c", "e").segments);
+
+        // Check simple comparisons
+        Path("a", "d", "g").should.be.greater(Path("a", "b", "c"));
+        Path("g", "d", "r").should.be.less(Path("m", "g", "x"));
+    }
+
+	/** Override equality comparison operators
+      **/
+    int opEquals(in Path other) const
+	{
+		return opCmp(other) == 0;
+	}
+
+	/// ditto
+	int opEquals(in ref Path other) const
+	{
+		return opCmp(other) == 0;
+	}
+
+    /// Test equality comparisons
+    unittest {
+        import dshould;
+
+        Path("a", "b").should.equal(Path("a", "b"));
+        Path("a", "b").should.not.equal(Path("a"));
+        Path("a", "b").should.not.equal(Path("a", "b", "c"));
+        Path("a", "b").should.not.equal(Path("a", "c"));
     }
 
     /// Return current path (as absolute path)
@@ -457,6 +529,41 @@ struct Path {
         std.file.chdir(_path.expandTilde);
     }
 
+    /** Change current working directory to path inside currect path
+      *
+      * Params:
+      *     sub_path = relative path inside this, to change directory to
+      **/
+    void chdir(in string[] sub_path...) const
+    in {
+        assert(
+            sub_path.length > 0,
+            "at least one path segment have to be provided");
+        assert(
+            !std.path.isAbsolute(sub_path[0]),
+            "sub_path must not be absolute");
+        version(Posix) assert(
+            !std.algorithm.startsWith(sub_path[0], "~"),
+            "sub_path must not start with '~' to " ~
+            "avoid automatic tilde expansion!");
+    } do {
+        this.join(sub_path).chdir();
+    }
+
+    /// ditto
+    void chdir(in Path sub_path) const
+    in {
+        assert(
+            !sub_path.isAbsolute,
+            "sub_path must not be absolute");
+        version(Posix) assert(
+            !std.algorithm.startsWith(sub_path._path, "~"),
+            "sub_path must not start with '~' to " ~
+            "avoid automatic tilde expansion!");
+    } do {
+        this.join(sub_path).chdir();
+    }
+
     ///
     unittest {
         import dshould;
@@ -482,6 +589,39 @@ struct Path {
             Path("~", tmp_dir_name).chdir;
             std.file.getcwd.should.equal(home_tmp._path);
         }
+    }
+
+    ///
+    unittest {
+        import dshould;
+        auto cdir = std.file.getcwd;
+        Path root = createTempPath();
+        scope(exit) {
+            std.file.chdir(cdir);
+            root.remove();
+        }
+
+        // Create some directories
+        root.join("my-dir", "some-dir", "some-sub-dir").mkdir(true);
+        root.join("my-dir", "other-dir").mkdir(true);
+
+        // Check current path is not equal to root
+        Path.current.should.not.equal(root);
+
+        // Change current working directory to test root, and check that it
+        // was changed
+        root.chdir;
+        Path.current.should.equal(root);
+
+        // Try to change current working directory to "my-dir" inside our
+        // test root dir
+        root.chdir("my-dir");
+        Path.current.should.equal(root.join("my-dir"));
+
+        // Try to change current dir to some-sub-dir, and check if it works
+        root.chdir(Path("my-dir", "some-dir", "some-sub-dir"));
+        Path.current.should.equal(
+            root.join("my-dir", "some-dir", "some-sub-dir"));
     }
 
     /** Copy single file to destination.
@@ -1595,62 +1735,5 @@ struct Path {
         import core.exception: AssertError;
         p5.get.should.throwA!AssertError;
     }
-
-    // TODO: to add:
-    //       - Override comparing operators
-    //       - Override operators join paths
-    //       - Implement alias this feature to make it easily convertible to string.
-    //       - match pattern
 }
 
-
-/// Example of using nullable paths as function parameters
-unittest {
-    import dshould;
-
-    /* simple function, that will join 'test.conf' to provided path
-     * if provided path is not null, and return null path is provided path
-     * is null
-     */
-    Nullable!Path test_path_fn(in Nullable!Path p) {
-        if (p.isNull)
-            return Nullable!Path.init;
-        return p.get.join("test.conf").nullable;
-    }
-
-    // Pass value to nullable param
-    auto p1 = test_path_fn(Path("hello").nullable);
-    p1.isNull.should.be(false);
-    p1.get.segments.should.equal(["hello", "test.conf"]);
-
-    // Pass null to nullable param
-    auto p2 = test_path_fn(Nullable!Path.init);
-    p1.isNull.should.be(false);
-}
-
-
-/// Example of using paths in structs
-unittest {
-    import dshould;
-
-    struct PStruct {
-        string name;
-        Path path;
-
-        bool check() const {
-            return path.exists;
-        }
-    }
-
-    PStruct p;
-
-    p.name = "test";
-
-    // Attempt to run operation on uninitialized path will throw error
-    import core.exception: AssertError;
-    p.check.should.throwA!AssertError;
-
-    // Let's initialize path and check it again
-    p.path = Path("some-unexisting-path-to-magic-file");
-    p.check.should.be(false);
-}

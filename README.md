@@ -6,7 +6,7 @@ Inspired by [Python's pathlib](https://docs.python.org/3/library/pathlib.html)
 and [D port of pathlib](https://code.dlang.org/packages/pathlib) but
 implementing it in different way.
 
-*NOTE*: this is alpha version, and api is still subject for change
+**NOTE**: this is alpha version, and api is still subject for change
 
 Following ideas used in this project
 - Implement struct or class `Path` that have to represent
@@ -25,6 +25,17 @@ it should work on other platforms too.
 If you want to help to make it crossplatform, then contact me (
 the first thing needed to make it cross platform, is to set up CI to run
 automated tests on other platforms).
+
+## To Do
+
+
+- [x] Override comparison operators
+- [ ] Override operators join paths
+- [ ] Implement alias this feature to make it easily convertible to string.
+    - Do we need this
+- [ ] match pattern
+- [ ] Add ability to work with extensions
+- [ ] Add automated tests for Windows
 
 
 ## Examples
@@ -52,3 +63,9 @@ void list_dir {
     }
 }
 ```
+
+For more example, check the documentation.
+
+## License
+
+This library is licensed under MPL-2.0 license
