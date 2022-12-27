@@ -90,6 +90,24 @@ struct Path {
         return std.path.isRooted(_path);
     }
 
+    /// Check if current path is inside other path
+    bool isInside(in Path other) const {
+        // TODO: May be there is better way to check if path
+        //       is inside another path
+        return std.algorithm.startsWith(
+            this.toAbsolute.segments,
+            other.toAbsolute.segments);
+    }
+
+    ///
+    unittest {
+        import dshould;
+
+        Path("my", "dir", "42").isInside(Path("my", "dir")).should.be(true);
+        Path("my", "dir", "42").isInside(Path("oth", "dir")).should.be(false);
+    }
+
+
     /** Split path on segments.
       * Under the hood, this method uses $(REF pathSplitter, std, path)
       **/
@@ -544,6 +562,16 @@ struct Path {
             root.join("d1", "d2", "test2.txt"),
             root.join("d1", "test1.txt"),
         ]);
+    }
+
+    /// Just an alias for walk(SpanModel.depth)
+    auto walkDepth(bool followSymlink=true) const {
+        return walk(SpanMode.depth, followSymlink);
+    }
+
+    /// Just an alias for walk(SpanModel.breadth)
+    auto walkBreadth(bool followSymlink=true) const {
+        return walk(SpanMode.breadth, followSymlink);
     }
 
     /// Change current working directory to this.
