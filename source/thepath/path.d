@@ -1211,7 +1211,7 @@ struct Path {
       * Throws:
       *     FileException
       **/
-    version(Posix) void symlink(in Path dest) {
+    version(Posix) void symlink(in Path dest) const {
         std.file.symlink(_path, dest._path);
     }
 
