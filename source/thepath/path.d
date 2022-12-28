@@ -15,7 +15,7 @@ private import thepath.utils: createTempPath, createTempDirectory;
 private import thepath.exception: PathException;
 
 
-/** Main struct to work with paths.
+/** Path - allows to easily work with path.
   **/
 struct Path {
     private string _path;
@@ -47,7 +47,6 @@ struct Path {
     }
 
     invariant {
-        // TODO: Possibly, we have to check path validity here too.
         assert(_path !is null, "Attempt to use uninitialized path!");
     }
 
@@ -88,6 +87,12 @@ struct Path {
     /// Check if path starts at root directory (or drive letter)
     bool isRooted() const {
         return std.path.isRooted(_path);
+    }
+
+    // TODO: make it crossplatfor, by checking if path references drive letter
+    /// Check if current path is root (does not have parent)
+    version(Posix) bool isRoot() const {
+        return _path == "/";
     }
 
     /// Check if current path is inside other path
@@ -530,8 +535,9 @@ struct Path {
       * Examples:
       * ---
       * // Iterate over paths in current directory
-      * foreach (Path p; Path(".").walk(SpanMode.breadth)) {
-      *     if (p.isFile) writeln(p);
+      * foreach (p; Path.current.walk(SpanMode.breadth)) {
+      *     if (p.isFile)
+      *         writeln(p);
       * ---
       **/
     auto walk(SpanMode mode=SpanMode.shallow, bool followSymlink=true) const {
@@ -754,9 +760,12 @@ struct Path {
       * If source is a file, then copyFileTo will be use to copy it.
       * If source is a directory, then more complex logic will be applied:
       *
-      *     - if dest already exists and it is not dir, then exception will be raised.
-      *     - if dest already exists and it is dir, then source dir will be copied inseide that dir with it's name
-      *     - if dest does not exists, then current directory will be copied to dest path.
+      * - if dest already exists and it is not dir,
+      *   then exception will be raised.
+      * - if dest already exists and it is dir,
+      *   then source dir will be copied inseide that dir with it's name
+      * - if dest does not exists,
+      *   then current directory will be copied to dest path.
       *
       * Note, that work with symlinks have to be improved. Not tested yet.
       *
@@ -1510,7 +1519,7 @@ struct Path {
       *
       *  Params:
       *      attributes = value representing attributes to set on path.
-     **/
+      **/
 
     void setAttributes(in uint attributes) const {
         std.file.setAttributes(_path, attributes);
@@ -1712,7 +1721,7 @@ struct Path {
     /// ditto
     version(Posix) Nullable!Path searchFileUp(in Path search_path) const {
         Path current_path = toAbsolute;
-        while (current_path._path != "/") {
+        while (!current_path.isRoot) {
             auto dst_path = current_path.join(search_path);
             if (dst_path.exists && dst_path.isFile) {
                 return dst_path.nullable;
@@ -1720,7 +1729,7 @@ struct Path {
             current_path = current_path.parent;
 
             if (current_path._path == current_path.parent._path)
-                // It seem that if current path is same as parent path,
+                // It seems that if current path is same as parent path,
                 // then it could be infinite loop. So, let's break the loop;
                 break;
         }
