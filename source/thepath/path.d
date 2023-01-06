@@ -24,7 +24,7 @@ struct Path {
       * Params:
       *    path = string representation of path to point to
       **/
-    this(in string path) {
+    @safe this(in string path) {
         _path = path;
     }
 
@@ -32,7 +32,7 @@ struct Path {
       * Params:
       *     segments = array of segments to build path from
       **/
-    this(in string[] segments...) {
+    @safe this(in string[] segments...) {
         _path = std.path.buildNormalizedPath(segments);
     }
 
@@ -53,7 +53,7 @@ struct Path {
     /** Check if path is valid.
       * Returns: true if this is valid path.
       **/
-    bool isValid() const {
+    @safe bool isValid() const {
         return std.path.isValidPath(_path);
     }
 
@@ -67,7 +67,7 @@ struct Path {
     }
 
     /// Check if path is absolute
-    bool isAbsolute() const {
+    @safe bool isAbsolute() const {
         return std.path.isAbsolute(_path);
     }
 
@@ -85,18 +85,18 @@ struct Path {
     }
 
     /// Check if path starts at root directory (or drive letter)
-    bool isRooted() const {
+    @safe bool isRooted() const {
         return std.path.isRooted(_path);
     }
 
     // TODO: make it crossplatfor, by checking if path references drive letter
     /// Check if current path is root (does not have parent)
-    version(Posix) bool isRoot() const {
+    version(Posix) @safe bool isRoot() const {
         return _path == "/";
     }
 
     /// Check if current path is inside other path
-    bool isInside(in Path other) const {
+    @safe bool isInside(in Path other) const {
         // TODO: May be there is better way to check if path
         //       is inside another path
         return std.algorithm.startsWith(
@@ -116,7 +116,7 @@ struct Path {
     /** Split path on segments.
       * Under the hood, this method uses $(REF pathSplitter, std, path)
       **/
-    auto segments() const {
+    @safe auto segments() const {
         return std.path.pathSplitter(_path);
     }
 
@@ -128,30 +128,30 @@ struct Path {
     }
 
     /// Determine if path is file.
-    bool isFile() const {
+    @safe bool isFile() const {
         return std.file.isFile(_path.expandTilde);
     }
 
     /// Determine if path is directory.
-    bool isDir() const {
+    @safe bool isDir() const {
         return std.file.isDir(_path.expandTilde);
     }
 
     /// Determine if path is symlink
-    bool isSymlink() const {
+    @safe bool isSymlink() const {
         return std.file.isSymlink(_path.expandTilde);
     }
 
     /** Override comparison operators to use OS-specific case-sensitivity
       * rules. They could be used for sorting of path array for example.
       **/
-	int opCmp(in Path other) const
+	@safe int opCmp(in Path other) const
 	{
 		return std.path.filenameCmp(this._path, other._path);
 	}
 
 	/// ditto
-	int opCmp(in ref Path other) const
+	@safe int opCmp(in ref Path other) const
 	{
 		return std.path.filenameCmp(this._path, other._path);
 	}
@@ -192,13 +192,13 @@ struct Path {
 
 	/** Override equality comparison operators
       **/
-    bool opEquals(in Path other) const
+    @safe bool opEquals(in Path other) const
 	{
 		return opCmp(other) == 0;
 	}
 
 	/// ditto
-	bool opEquals(in ref Path other) const
+	@safe bool opEquals(in ref Path other) const
 	{
 		return opCmp(other) == 0;
 	}
@@ -216,7 +216,7 @@ struct Path {
     /** Compute hash of the Path to be able to use it as key
       * in asociative arrays.
       **/
-    size_t toHash() @trusted const nothrow {
+    @safe size_t toHash() const nothrow {
         return typeid(_path).getHash(&_path);
     }
 
@@ -236,7 +236,7 @@ struct Path {
     }
 
     /// Return current path (as absolute path)
-    static Path current() {
+    @safe static Path current() {
         return Path(".").toAbsolute;
     }
 
@@ -259,7 +259,7 @@ struct Path {
     }
 
     /// Check if path exists
-    bool exists() const {
+    @safe bool exists() const {
         return std.file.exists(_path.expandTilde);
     }
 
@@ -286,7 +286,7 @@ struct Path {
     }
 
     /// Return path as string
-    string toString() const {
+    @safe string toString() const {
         return _path;
     }
 
@@ -297,7 +297,7 @@ struct Path {
       *          Also, this method will automatically do tilde expansion and
       *          normalization of path.
       **/
-    Path toAbsolute() const {
+    @safe Path toAbsolute() const {
         return Path(
             std.path.buildNormalizedPath(
                 std.path.absolutePath(_path.expandTilde)));
@@ -326,18 +326,15 @@ struct Path {
     /** Expand tilde (~) in current path.
       * Returns: New path with tilde expaded
       **/
-    Path expandTilde() const {
+    @safe Path expandTilde() const {
         return Path(std.path.expandTilde(_path));
     }
 
     /** Normalize path.
       * Returns: new normalized Path.
       **/
-    Path normalize() const {
-        import std.array : array;
-        import std.exception : assumeUnique;
-        auto result = std.path.asNormalizedPath(_path);
-        return Path(assumeUnique(result.array));
+    @safe Path normalize() const {
+        return Path(std.path.buildNormalizedPath(_path));
     }
 
     ///
@@ -357,14 +354,14 @@ struct Path {
       * Returns:
       *     New path build from current path and provided segments
       **/
-    Path join(in string[] segments...) const {
+    @safe Path join(in string[] segments...) const {
         string[] args=[cast(string)_path];
         foreach(s; segments) args ~= s;
         return Path(std.path.buildPath(args));
     }
 
     /// ditto
-    Path join(in Path[] segments...) const {
+    @safe Path join(in Path[] segments...) const {
         string[] args=[];
         foreach(p; segments) args ~= p.toString();
         return this.join(args);
@@ -398,7 +395,7 @@ struct Path {
       * Returns:
       *     Absolute Path to parent directory.
       **/
-    Path parent() const {
+    @safe Path parent() const {
         if (isAbsolute()) {
             return Path(std.path.dirName(_path));
         } else {
@@ -438,7 +435,7 @@ struct Path {
       * Throws:
       *     PathException if base path is not valid or not absolute
       **/
-    Path relativeTo(in Path base) const {
+    @safe Path relativeTo(in Path base) const {
         enforce!PathException(
             base.isValid && base.isAbsolute,
             "Base path must be valid and absolute");
@@ -446,7 +443,7 @@ struct Path {
     }
 
     /// ditto
-    Path relativeTo(in string base) const {
+    @safe Path relativeTo(in string base) const {
         return relativeTo(Path(base));
     }
 
@@ -471,12 +468,12 @@ struct Path {
     }
 
     /// Returns extension for current path
-    string extension() const {
+    @safe string extension() const {
         return std.path.extension(_path);
     }
 
     /// Returns base name of current path
-    string baseName() const {
+    @safe string baseName() const {
         return std.path.baseName(_path);
     }
 
@@ -489,7 +486,7 @@ struct Path {
     }
 
     /// Return size of file specified by path
-    ulong getSize() const {
+    @safe ulong getSize() const {
         return std.file.getSize(_path.expandTilde);
     }
 
@@ -518,7 +515,7 @@ struct Path {
       * Available only for posix systems.
       * If path is not symlink, then return it unchanged
       **/
-    version(Posix) Path readLink() const {
+    version(Posix) @safe Path readLink() const {
         if (isSymlink()) {
             return Path(std.file.readLink(_path.expandTilde));
         } else {
@@ -581,7 +578,7 @@ struct Path {
     }
 
     /// Change current working directory to this.
-    void chdir() const {
+    @safe void chdir() const {
         std.file.chdir(_path.expandTilde);
     }
 
@@ -590,7 +587,7 @@ struct Path {
       * Params:
       *     sub_path = relative path inside this, to change directory to
       **/
-    void chdir(in string[] sub_path...) const
+    @safe void chdir(in string[] sub_path...) const
     in {
         assert(
             sub_path.length > 0,
@@ -607,7 +604,7 @@ struct Path {
     }
 
     /// ditto
-    void chdir(in Path sub_path) const
+    @safe void chdir(in Path sub_path) const
     in {
         assert(
             !sub_path.isAbsolute,
@@ -697,7 +694,7 @@ struct Path {
       *         if destination already exists and
       *         it is not a directory and rewrite is set to false.
       **/
-    void copyFileTo(in Path dest, in bool rewrite=false) const {
+    @safe void copyFileTo(in Path dest, in bool rewrite=false) const {
         enforce!PathException(
             this.exists,
             "Cannot Copy! Source file %s does not exists!".format(_path));
@@ -982,7 +979,7 @@ struct Path {
       * then directory itself and all content inside referenced dir will be
       * removed
       **/
-    void remove() const {
+    @safe void remove() const {
         if (isFile) std.file.remove(_path.expandTilde);
         else std.file.rmdirRecurse(_path.expandTilde);
     }
@@ -1059,7 +1056,7 @@ struct Path {
       * Throws:
       *     PathException when destination already exists
       **/
-    void rename(in Path to) const {
+    @safe void rename(in Path to) const {
         // TODO: Add support to move files between filesystems
         enforce!PathException(
             !to.exists,
@@ -1068,7 +1065,7 @@ struct Path {
     }
 
     /// ditto
-    void rename(in string to) const {
+    @safe void rename(in string to) const {
         return rename(Path(to));
     }
 
@@ -1171,7 +1168,7 @@ struct Path {
       * Throws:
       *     FileException if cannot create dir (it already exists)
       **/
-    void mkdir(in bool recursive=false) const {
+    @safe void mkdir(in bool recursive=false) const {
         if (recursive) std.file.mkdirRecurse(std.path.expandTilde(_path));
         else std.file.mkdir(std.path.expandTilde(_path));
     }
@@ -1220,7 +1217,7 @@ struct Path {
       * Throws:
       *     FileException
       **/
-    version(Posix) void symlink(in Path dest) const {
+    version(Posix) @safe void symlink(in Path dest) const {
         std.file.symlink(_path, dest._path);
     }
 
@@ -1252,7 +1249,7 @@ struct Path {
       * Returns:
       *     std.stdio.File struct
       **/
-    std.stdio.File openFile(in string openMode = "rb") const {
+    @safe std.stdio.File openFile(in string openMode = "rb") const {
         static import std.stdio;
 
         return std.stdio.File(_path.expandTilde, openMode);
@@ -1280,7 +1277,7 @@ struct Path {
       * Throws:
       *     FileException in case of  error
       **/
-    void writeFile(in void[] buffer) const {
+    @safe void writeFile(in void[] buffer) const {
         return std.file.write(_path.expandTilde, buffer);
     }
 
@@ -1314,7 +1311,7 @@ struct Path {
       * Throws:
       *     FileException in case of  error
       **/
-    void appendFile(in void[] buffer) const {
+    @safe void appendFile(in void[] buffer) const {
         return std.file.append(_path.expandTilde, buffer);
     }
 
@@ -1352,7 +1349,7 @@ struct Path {
       * Throws:
       *     FileException in case of error
       **/
-    auto readFile(size_t upTo=size_t.max) const {
+    @safe auto readFile(size_t upTo=size_t.max) const {
         return std.file.read(_path.expandTilde, upTo);
     }
 
@@ -1401,7 +1398,7 @@ struct Path {
       *     $(LREF FileException) if there is an error reading the file,
       *     $(REF UTFException, std, utf) on UTF decoding error.
       **/
-    auto readFileText(S=string)() const {
+    @safe auto readFileText(S=string)() const {
         return std.file.readText!S(_path.expandTilde);
     }
 
@@ -1437,7 +1434,7 @@ struct Path {
       *  Returns:
       *      uint - represening attributes of the file
       **/
-    auto getAttributes() const {
+    @safe auto getAttributes() const {
         return std.file.getAttributes(_path.expandTilde);
     }
 
@@ -1475,7 +1472,7 @@ struct Path {
       *     false if at lease one bit specified by attributes is not set.
       *
       **/
-    bool hasAttributes(in uint attributes) const {
+    @safe bool hasAttributes(in uint attributes) const {
         return (this.getAttributes() & attributes) == attributes;
 
     }
@@ -1521,7 +1518,7 @@ struct Path {
       *      attributes = value representing attributes to set on path.
       **/
 
-    void setAttributes(in uint attributes) const {
+    @safe void setAttributes(in uint attributes) const {
         std.file.setAttributes(_path, attributes);
     }
 
@@ -1586,7 +1583,7 @@ struct Path {
       * Returns:
       *     An $(D std.typecons.Tuple!(int, "status", string, "output")).
       **/
-    auto execute(in string[] args=[],
+    @safe auto execute(in string[] args=[],
             in string[string] env=null,
             in Nullable!Path workDir=Nullable!Path.init,
             in std.process.Config config=std.process.Config.none,
@@ -1600,12 +1597,12 @@ struct Path {
     }
 
     /// ditto
-    auto execute(in string[] args,
+    @safe auto execute(in string[] args,
             in string[string] env,
             in Path workDir,
             in std.process.Config config=std.process.Config.none,
             in size_t maxOutput=size_t.max) const {
-        return execute(args, env, cast(const Nullable!Path)workDir.nullable, config, maxOutput);
+        return execute(args, env, Nullable!Path(workDir), config, maxOutput);
     }
 
 
@@ -1714,12 +1711,12 @@ struct Path {
       *     Path to searched file, if such file was found.
       *     Otherwise return null Path.
       **/
-    version(Posix) Nullable!Path searchFileUp(in string file_name) const {
+    version(Posix) @safe Nullable!Path searchFileUp(in string file_name) const {
         return searchFileUp(Path(file_name));
     }
 
     /// ditto
-    version(Posix) Nullable!Path searchFileUp(in Path search_path) const {
+    version(Posix) @safe Nullable!Path searchFileUp(in Path search_path) const {
         Path current_path = toAbsolute;
         while (!current_path.isRoot) {
             auto dst_path = current_path.join(search_path);
