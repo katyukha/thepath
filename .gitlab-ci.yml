@@ -3,7 +3,6 @@ lint:
   before_script:
     - apt update
     - apt install -yqq wget
-    - wget -O /tmp/dmd.deb https://s3.us-west-2.amazonaws.com/downloads.dlang.org/releases/2022/dmd_2.100.2-0_amd64.deb
     - wget -O /tmp/dmd.deb http://downloads.dlang.org/releases/2.x/2.101.2/dmd_2.101.2-0_amd64.deb
     - apt install -yqq /tmp/dmd.deb
     - apt install -yqq -f
@@ -16,8 +15,7 @@ test:
   before_script:
     - apt update
     - apt install -yqq wget
-    - wget -O /tmp/dmd.deb https://s3.us-west-2.amazonaws.com/downloads.dlang.org/releases/2022/dmd_2.100.2-0_amd64.deb
-    - wget -O /tmp/dmd.deb http://downloads.dlang.org/releases/2.x/2.100.2/dmd_2.100.2-0_amd64.deb
+    - wget -O /tmp/dmd.deb http://downloads.dlang.org/releases/2.x/2.101.2/dmd_2.101.2-0_amd64.deb
     - apt install -yqq /tmp/dmd.deb
     - apt install -yqq -f
   script:
