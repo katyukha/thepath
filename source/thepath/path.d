@@ -24,7 +24,7 @@ struct Path {
       * Params:
       *    path = string representation of path to point to
       **/
-    @safe this(in string path) {
+    @safe pure nothrow this(in string path) {
         _path = path;
     }
 
@@ -32,7 +32,7 @@ struct Path {
       * Params:
       *     segments = array of segments to build path from
       **/
-    @safe this(in string[] segments...) {
+    @safe pure nothrow this(in string[] segments...) {
         _path = std.path.buildNormalizedPath(segments);
     }
 
@@ -53,7 +53,7 @@ struct Path {
     /** Check if path is valid.
       * Returns: true if this is valid path.
       **/
-    @safe bool isValid() const {
+    @safe pure nothrow bool isValid() const {
         return std.path.isValidPath(_path);
     }
 
@@ -67,7 +67,7 @@ struct Path {
     }
 
     /// Check if path is absolute
-    @safe bool isAbsolute() const {
+    @safe pure nothrow bool isAbsolute() const {
         return std.path.isAbsolute(_path);
     }
 
@@ -85,13 +85,13 @@ struct Path {
     }
 
     /// Check if path starts at root directory (or drive letter)
-    @safe bool isRooted() const {
+    @safe pure nothrow bool isRooted() const {
         return std.path.isRooted(_path);
     }
 
-    // TODO: make it crossplatfor, by checking if path references drive letter
+    // TODO: make it crossplatform, by checking if path references drive letter
     /// Check if current path is root (does not have parent)
-    version(Posix) @safe bool isRoot() const {
+    version(Posix) @safe pure bool isRoot() const {
         return _path == "/";
     }
 
@@ -116,7 +116,7 @@ struct Path {
     /** Split path on segments.
       * Under the hood, this method uses $(REF pathSplitter, std, path)
       **/
-    @safe auto segments() const {
+    @safe pure auto segments() const {
         return std.path.pathSplitter(_path);
     }
 
@@ -145,13 +145,13 @@ struct Path {
     /** Override comparison operators to use OS-specific case-sensitivity
       * rules. They could be used for sorting of path array for example.
       **/
-	@safe int opCmp(in Path other) const
+	@safe pure nothrow int opCmp(in Path other) const
 	{
 		return std.path.filenameCmp(this._path, other._path);
 	}
 
 	/// ditto
-	@safe int opCmp(in ref Path other) const
+	@safe pure nothrow int opCmp(in ref Path other) const
 	{
 		return std.path.filenameCmp(this._path, other._path);
 	}
@@ -192,13 +192,13 @@ struct Path {
 
 	/** Override equality comparison operators
       **/
-    @safe bool opEquals(in Path other) const
+    @safe pure nothrow bool opEquals(in Path other) const
 	{
 		return opCmp(other) == 0;
 	}
 
 	/// ditto
-	@safe bool opEquals(in ref Path other) const
+	@safe pure nothrow bool opEquals(in ref Path other) const
 	{
 		return opCmp(other) == 0;
 	}
@@ -216,7 +216,7 @@ struct Path {
     /** Compute hash of the Path to be able to use it as key
       * in asociative arrays.
       **/
-    @safe size_t toHash() const nothrow {
+    @safe nothrow size_t toHash() const {
         return typeid(_path).getHash(&_path);
     }
 
@@ -259,7 +259,7 @@ struct Path {
     }
 
     /// Check if path exists
-    @safe bool exists() const {
+    @safe nothrow bool exists() const {
         return std.file.exists(_path.expandTilde);
     }
 
@@ -286,7 +286,7 @@ struct Path {
     }
 
     /// Return path as string
-    @safe string toString() const {
+    @safe pure nothrow string toString() const {
         return _path;
     }
 
@@ -296,6 +296,7 @@ struct Path {
       *          absolute path.
       *          Also, this method will automatically do tilde expansion and
       *          normalization of path.
+      * Throws: Exception if the specified base directory is not absolute.
       **/
     @safe Path toAbsolute() const {
         return Path(
@@ -326,14 +327,14 @@ struct Path {
     /** Expand tilde (~) in current path.
       * Returns: New path with tilde expaded
       **/
-    @safe Path expandTilde() const {
+    @safe nothrow Path expandTilde() const {
         return Path(std.path.expandTilde(_path));
     }
 
     /** Normalize path.
       * Returns: new normalized Path.
       **/
-    @safe Path normalize() const {
+    @safe pure nothrow Path normalize() const {
         return Path(std.path.buildNormalizedPath(_path));
     }
 
@@ -354,14 +355,14 @@ struct Path {
       * Returns:
       *     New path build from current path and provided segments
       **/
-    @safe Path join(in string[] segments...) const {
+    @safe pure nothrow Path join(in string[] segments...) const {
         string[] args=[cast(string)_path];
         foreach(s; segments) args ~= s;
         return Path(std.path.buildPath(args));
     }
 
     /// ditto
-    @safe Path join(in Path[] segments...) const {
+    @safe pure nothrow Path join(in Path[] segments...) const {
         string[] args=[];
         foreach(p; segments) args ~= p.toString();
         return this.join(args);
@@ -435,7 +436,7 @@ struct Path {
       * Throws:
       *     PathException if base path is not valid or not absolute
       **/
-    @safe Path relativeTo(in Path base) const {
+    @safe pure Path relativeTo(in Path base) const {
         enforce!PathException(
             base.isValid && base.isAbsolute,
             "Base path must be valid and absolute");
@@ -443,7 +444,7 @@ struct Path {
     }
 
     /// ditto
-    @safe Path relativeTo(in string base) const {
+    @safe pure Path relativeTo(in string base) const {
         return relativeTo(Path(base));
     }
 
@@ -468,12 +469,12 @@ struct Path {
     }
 
     /// Returns extension for current path
-    @safe string extension() const {
+    @safe pure nothrow string extension() const {
         return std.path.extension(_path);
     }
 
     /// Returns base name of current path
-    @safe string baseName() const {
+    @safe pure nothrow string baseName() const {
         return std.path.baseName(_path);
     }
 
