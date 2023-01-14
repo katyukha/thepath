@@ -16,7 +16,8 @@ Following ideas used in design of this lib:
   instead of modifying original.
 - Simplify naming for frequent operations
   (introducing new type for this allows to do it without name collisions).
-- Automatic tilde expansion when needed (for example before file operations),
+- Automatic tilde (`~`) expansion when needed
+  (for example before file operations),
   thus allowing to easily work with path like `~/my/path`,
   that will be resolved implicitly, without any special work needed.
 - Make this lib as convenient as possible.
@@ -29,9 +30,8 @@ Following ideas used in design of this lib:
   Are there any cases when such thing have to be supported?
 - This lib have to be well tested.
 
-
 **Warning**: Currently this lib is not tested on Windows or other platforms.
-So, it surelly works on Posix (linux only), but possibly,
+So, it surelly works on Posix (tested on linux only), but possibly,
 it should work on other platforms too.
 If you want to help to make it crossplatform, then contact me (
 the first thing needed to make it cross platform, is to set up CI to run
@@ -56,21 +56,20 @@ automated tests on other platforms).
 - file operations as methods:
     - `Path("my-path").readFile()`
     - `Path("my-path").writeFile("Hello world")`
+- support search by glob-pattern
 
 
 ## To Do
 
 
-- [x] Override comparison operators
 - [ ] Override operators join paths, to be able to do things like:
     - `Path("a") ~ Path("b") == Path("a").join(Path("b"))`
     - `Path("a") ~ "b" == Path("a").join("b")`
+    - Do we need this? It seems that `Path("a").join("b", "c")` looks good enough.
 - [ ] Implement `alias this` feature to make it easily convertible to string.
     - Do we need this feature?
       It seems that it is better to avoid implicit conversion to string,
       at least unless multiple `alias this` supported in D.
-- [ ] match pattern, to be able to do things like:
-    - `Path("my-project").glob("models/*.py")` that returns paths to all `*.py` files
 - [ ] Add automated tests for Windows
 - Any other features needed?
 
@@ -98,9 +97,16 @@ void init() {
 
 void list_dir() {
     // Easily print content of the catalog directory
-    fopeach(Path p; catalog_dir.walkBreadth) {
+    foreach(Path p; catalog_dir.walkBreadth) {
         writeln(p.toAbsolute().toString());
     }
+}
+
+// Print all python files in current directory
+void find_python_files() {
+    foreach(path; Path.current.glob("*.py", SpanMode.breadth))
+        // Print paths relative to current directory
+        writeln(p.relativeTo(Path.current).toString);
 }
 
 Path findConfig() {

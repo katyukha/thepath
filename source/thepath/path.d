@@ -524,6 +524,15 @@ struct Path {
         }
     }
 
+    /** Check if path matches specified glob pattern.
+      * See Also:
+      * - https://en.wikipedia.org/wiki/Glob_%28programming%29
+      * - https://dlang.org/phobos/std_path.html#globMatch
+      **/
+    @safe pure nothrow bool matchGlob(in string pattern) {
+        return std.path.globMatch(_path, pattern);
+    }
+
     /** Iterate over all files and directories inside path;
       *
       * Params:
@@ -538,7 +547,7 @@ struct Path {
       *         writeln(p);
       * ---
       **/
-    auto walk(SpanMode mode=SpanMode.shallow, bool followSymlink=true) const {
+    @safe auto walk(in SpanMode mode=SpanMode.shallow, bool followSymlink=true) const {
         import std.algorithm.iteration: map;
         return std.file.dirEntries(
             _path, mode, followSymlink).map!(a => Path(a));
@@ -569,13 +578,71 @@ struct Path {
     }
 
     /// Just an alias for walk(SpanModel.depth)
-    auto walkDepth(bool followSymlink=true) const {
+    @safe auto walkDepth(bool followSymlink=true) const {
         return walk(SpanMode.depth, followSymlink);
     }
 
     /// Just an alias for walk(SpanModel.breadth)
-    auto walkBreadth(bool followSymlink=true) const {
+    @safe auto walkBreadth(bool followSymlink=true) const {
         return walk(SpanMode.breadth, followSymlink);
+    }
+
+    /** Search files that match provided glob pattern inside current path.
+      *
+      * Params:
+      *     pattern = The glob pattern to apply to paths inside current dir.
+      *     mode = The way to traverse directories. See [docs](https://dlang.org/phobos/std_file.html#SpanMode)
+      *     followSymlink = do we need to follow symlinks of not. By default set to True.
+      * Returns:
+      *     Range of absolute path inside specified directory, that match
+      *     specified glob pattern.
+      **/
+    @safe auto glob(in string pattern,
+            in SpanMode mode=SpanMode.shallow,
+            bool followSymlink=true,
+            bool relative=false) {
+        import std.algorithm.iteration: filter;
+        Path base = this.toAbsolute;
+        return base.walk(mode, followSymlink).filter!(
+            f => f.relativeTo(base).matchGlob(pattern));
+    }
+
+    ///
+    unittest {
+        import dshould;
+        import std.array: array;
+        import std.algorithm: sort;
+        Path root = createTempPath();
+        scope(exit) root.remove();
+
+        // Create sample directory structure
+        root.join("d1").mkdir(true);
+        root.join("d1", "d2").mkdir(true);
+        root.join("d1", "test1.txt").writeFile("Test 1");
+        root.join("d1", "test2.txt").writeFile("Test 2");
+        root.join("d1", "test3.py").writeFile("print('Test 3')");
+        root.join("d1", "d2", "test4.py").writeFile("print('Test 4')");
+        root.join("d1", "d2", "test5.py").writeFile("print('Test 5')");
+        root.join("d1", "d2", "test6.txt").writeFile("print('Test 6')");
+
+        // Find py files in directory d1
+        root.join("d1").glob("*.py").array.should.equal([
+            root.join("d1", "test3.py"),
+        ]);
+
+        // Find py files in directory d1 recursively
+        root.join("d1").glob("*.py", SpanMode.breadth).array.should.equal([
+            root.join("d1", "test3.py"),
+            root.join("d1", "d2", "test4.py"),
+            root.join("d1", "d2", "test5.py"),
+        ]);
+
+        // Find py files in directory d1 recursively
+        root.join("d1").glob("*.txt", SpanMode.breadth).array.sort.array.should.equal([
+            root.join("d1", "d2", "test6.txt"),
+            root.join("d1", "test1.txt"),
+            root.join("d1", "test2.txt"),
+        ]);
     }
 
     /// Change current working directory to this.
