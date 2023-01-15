@@ -49,20 +49,24 @@ automated tests on other platforms).
 - single method to copy path (file or directory) to dest path
 - single method to remove path (file or directory)
 - simple method to `walk` through the path
-- simple constuction of paths from parts:
+    - `foreach(p; Path.current.walk) writeln(p.toString);`
+    - `foreach(p; Path("/tmp").walk) writeln(p.toString);`
+- simple construction of paths from parts:
     - `Path("a", "b", "c")`
     - `Path("a").join("b", "c")`
 - simple deconstruction of paths
     - `Path("a/b/c/d").segments == ["a", "b", "c", "d"]`
+    - `Path("a", "b", "c", "d").segments == ["a", "b", "c", "d"]`
 - overriden comparison operators for paths.
     - `Path("a", "b") == Path("a", "b")`
     - `Path("a", "b") != Path("a", "c")`
     - `Path("a", "b") < Path("a", "c")`
 - `hasAttributes` / `getAttributes` / `setAttributes` methods to work with file attrs
 - file operations as methods:
-    - `Path("my-path").readFile()`
     - `Path("my-path").writeFile("Hello world")`
+    - `Path("my-path").readFile()`
 - support search by glob-pattern
+    - `foreach(path; Path.current.glob("*.py")) writeln(p.toString);`
 
 
 ## To Do

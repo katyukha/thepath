@@ -547,7 +547,7 @@ struct Path {
       *         writeln(p);
       * ---
       **/
-    @safe auto walk(in SpanMode mode=SpanMode.shallow, bool followSymlink=true) const {
+    auto walk(in SpanMode mode=SpanMode.shallow, bool followSymlink=true) const {
         import std.algorithm.iteration: map;
         return std.file.dirEntries(
             _path, mode, followSymlink).map!(a => Path(a));
@@ -578,12 +578,12 @@ struct Path {
     }
 
     /// Just an alias for walk(SpanModel.depth)
-    @safe auto walkDepth(bool followSymlink=true) const {
+    auto walkDepth(bool followSymlink=true) const {
         return walk(SpanMode.depth, followSymlink);
     }
 
     /// Just an alias for walk(SpanModel.breadth)
-    @safe auto walkBreadth(bool followSymlink=true) const {
+    auto walkBreadth(bool followSymlink=true) const {
         return walk(SpanMode.breadth, followSymlink);
     }
 
@@ -597,7 +597,7 @@ struct Path {
       *     Range of absolute path inside specified directory, that match
       *     specified glob pattern.
       **/
-    @safe auto glob(in string pattern,
+    auto glob(in string pattern,
             in SpanMode mode=SpanMode.shallow,
             bool followSymlink=true) {
         import std.algorithm.iteration: filter;
