@@ -19,5 +19,6 @@ test:
     - apt install -yqq /tmp/dmd.deb
     - apt install -yqq -f
   script:
+    - dub build
     - dub test
 
