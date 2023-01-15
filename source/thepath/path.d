@@ -599,8 +599,7 @@ struct Path {
       **/
     @safe auto glob(in string pattern,
             in SpanMode mode=SpanMode.shallow,
-            bool followSymlink=true,
-            bool relative=false) {
+            bool followSymlink=true) {
         import std.algorithm.iteration: filter;
         Path base = this.toAbsolute;
         return base.walk(mode, followSymlink).filter!(
@@ -631,10 +630,10 @@ struct Path {
         ]);
 
         // Find py files in directory d1 recursively
-        root.join("d1").glob("*.py", SpanMode.breadth).array.should.equal([
-            root.join("d1", "test3.py"),
+        root.join("d1").glob("*.py", SpanMode.breadth).array.sort.array.should.equal([
             root.join("d1", "d2", "test4.py"),
             root.join("d1", "d2", "test5.py"),
+            root.join("d1", "test3.py"),
         ]);
 
         // Find py files in directory d1 recursively

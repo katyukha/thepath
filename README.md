@@ -6,6 +6,12 @@ Inspired by [Python's pathlib](https://docs.python.org/3/library/pathlib.html)
 and [D port of pathlib](https://code.dlang.org/packages/pathlib) but
 implementing it in different way.
 
+---
+[![pipeline status](https://gitlab.com/katyukha/thepath/badges/master/pipeline.svg)](https://gitlab.com/katyukha/thepath/-/commits/master)
+[![DUB](https://img.shields.io/dub/v/thepath)](https://code.dlang.org/packages/thepath)
+![DUB](https://img.shields.io/dub/l/thepath)
+---
+
 **NOTE**: this is alpha version, and api is still subject for change
 
 Following ideas used in design of this lib:
