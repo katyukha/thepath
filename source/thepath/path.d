@@ -524,6 +524,28 @@ struct Path {
         }
     }
 
+    /** Get real path with all symlinks resolved.
+      * If any segment of path is symlink, then this method will automatically
+      * resolve that segment.
+      **/
+    version(Posix) Path realPath() const {
+        import core.sys.posix.stdlib : realpath;
+        import core.stdc.stdlib: free;
+        import std.string: toStringz, fromStringz;
+        import std.exception: errnoEnforce;
+        import std.conv: to;
+
+        auto conv_path = _path.toStringz;
+        auto result = realpath(conv_path, null);
+        scope (exit) {
+            if (result)
+                free(result);
+        }
+        errnoEnforce(result);
+        return Path(to!(string)(result));
+    }
+
+
     /** Check if path matches specified glob pattern.
       * See Also:
       * - https://en.wikipedia.org/wiki/Glob_%28programming%29
@@ -827,7 +849,7 @@ struct Path {
       * - if dest already exists and it is not dir,
       *   then exception will be raised.
       * - if dest already exists and it is dir,
-      *   then source dir will be copied inseide that dir with it's name
+      *   then source dir will be copied inside that dir with it's name
       * - if dest does not exists,
       *   then current directory will be copied to dest path.
       *
@@ -1302,10 +1324,25 @@ struct Path {
         root.join("test-dir", "subdir", "test-file.txt").symlink(
             root.join("test-symlink.txt"));
 
+        // Create a symbolik link to directory
+        root.join("test-dir", "subdir").symlink(root.join("dirlink"));
+
         // Test that symlink was created
         root.join("test-symlink.txt").exists.should.be(true);
         root.join("test-symlink.txt").isSymlink.should.be(true);
         root.join("test-symlink.txt").readFile.should.equal("Hello!");
+
+        // Test that readlink and realpath works fine
+        root.join("test-symlink.txt").readLink.should.equal(
+            root.join("test-dir", "subdir", "test-file.txt"));
+        root.join("test-symlink.txt").realPath.should.equal(
+            root.join("test-dir", "subdir", "test-file.txt"));
+        root.join("dirlink", "test-file.txt").readLink.should.equal(
+            root.join("dirlink", "test-file.txt"));
+        root.join("dirlink", "test-file.txt").realPath.should.equal(
+            root.join("test-dir", "subdir", "test-file.txt"));
+
+
     }
 
     /** Open file and return `std.stdio.File` struct with opened file

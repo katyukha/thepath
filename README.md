@@ -81,6 +81,7 @@ automated tests on other platforms).
       It seems that it is better to avoid implicit conversion to string,
       at least unless multiple `alias this` supported in D.
 - [ ] Add automated tests for Windows
+- [ ] Add func to convert to stringz
 - Any other features needed?
 
 
