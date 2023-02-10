@@ -355,16 +355,15 @@ struct Path {
       * Returns:
       *     New path build from current path and provided segments
       **/
-    @safe pure nothrow Path join(in string[] segments...) const {
-        string[] args=[cast(string)_path];
-        foreach(s; segments) args ~= s;
+    @safe pure nothrow auto join(in string[] segments...) const {
+        auto args=[_path] ~ segments;
         return Path(std.path.buildPath(args));
     }
 
     /// ditto
     @safe pure nothrow Path join(in Path[] segments...) const {
         string[] args=[];
-        foreach(p; segments) args ~= p.toString();
+        foreach(p; segments) args ~= p._path;
         return this.join(args);
     }
 
