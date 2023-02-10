@@ -51,6 +51,7 @@ string createTempDirectory(in string path, in string prefix) {
     } else {
         import std.ascii: letters;
         import std.random: uniform;
+        import std.file;
 
         // Generate new random temp path to test using provided path and prefix
         // as template.
@@ -61,6 +62,8 @@ string createTempDirectory(in string path, in string prefix) {
                 std.path.expandTilde(path), prefix ~ suffix);
         }
 
+        // TODO: Improve security of this approach by creating directory
+        //       and catching exception if directory already exists.
         string temp_dir = generate_temp_dir();
         while (std.file.exists(temp_dir)) {
             temp_dir = generate_temp_dir();

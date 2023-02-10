@@ -89,10 +89,42 @@ struct Path {
         return std.path.isRooted(_path);
     }
 
-    // TODO: make it crossplatform, by checking if path references drive letter
     /// Check if current path is root (does not have parent)
-    version(Posix) @safe pure bool isRoot() const {
-        return _path == "/";
+    @safe pure bool isRoot() const {
+        import std.path: isDirSeparator;
+
+        version(Posix) {
+            return _path == "/";
+        } else version (Windows) {
+            if (_path.length == 3 && _path[1] == ':' &&
+                    isDirSeparator(_path[2])) {
+                return true;
+            } else if (_path.length == 1 && isDirSeparator(_path[0])) {
+                return true;
+            }
+            return false;
+        }
+        else static assert(0, "unsupported platform");
+    }
+
+    /// Posix
+    version(Posix) unittest {
+        import dshould;
+        Path("/").isRoot.should.be(true);
+        Path("/some-dir").isRoot.should.be(false);
+        Path("local").isRoot.should.be(false);
+        Path("").isRoot.should.be(false);
+    }
+
+    /// Windows
+    version(Windows) unittest {
+        import dshould;
+        Path(r"C:\").isRoot.should.be(true);
+        Path(r"D:\").isRoot.should.be(true);
+        Path(r"D:\some-dir").isRoot.should.be(false);
+        Path(r"\").isRoot.should.be(true);
+        Path(r"\local").isRoot.should.be(false);
+        Path("").isRoot.should.be(false);
     }
 
     /// Check if current path is inside other path
@@ -255,7 +287,16 @@ struct Path {
         root.join("dir1", "dir2", "dir3").chdir;
 
         // Check that current path is equal to dir1/dir2/dir3 (current dir)
-        Path.current.toString.should.equal(root.join("dir1", "dir2", "dir3").toString);
+        version(OSX) {
+            // On OSX we have to resolve symbolic links,
+            // because result of createTempPath contains symmbolic links
+            // for some reason, but current returns path with symlinks resolved
+            Path.current.toString.should.equal(
+                    root.join("dir1", "dir2", "dir3").realPath.toString);
+        } else {
+            Path.current.toString.should.equal(
+                    root.join("dir1", "dir2", "dir3").toString);
+        }
     }
 
     /// Check if path exists
@@ -311,10 +352,21 @@ struct Path {
         version(Posix) {
             auto cdir = std.file.getcwd;
             scope(exit) std.file.chdir(cdir);
+
+            // Change current working directory to /tmp"
             std.file.chdir("/tmp");
 
-            Path("foo/moo").toAbsolute.toString.should.equal("/tmp/foo/moo");
-            Path("../my-path").toAbsolute.toString.should.equal("/my-path");
+            version(OSX) {
+                // On OSX /tmp is symlink to /private/tmp
+                Path("/tmp").realPath.should.equal(Path("/private/tmp"));
+                Path("foo/moo").toAbsolute.toString.should.equal(
+                    "/private/tmp/foo/moo");
+                Path("../my-path").toAbsolute.toString.should.equal("/private/my-path");
+            } else {
+                Path("foo/moo").toAbsolute.toString.should.equal("/tmp/foo/moo");
+                Path("../my-path").toAbsolute.toString.should.equal("/my-path");
+            }
+
             Path("/a/path").toAbsolute.toString.should.equal("/a/path");
 
             string home_path = "~".expandTilde;
@@ -419,7 +471,13 @@ struct Path {
 
             std.file.chdir("/tmp");
 
-            Path("parent/child").parent.toString.should.equal("/tmp/parent");
+            version(OSX) {
+                Path("parent/child").parent.toString.should.equal(
+                    "/private/tmp/parent");
+            } else {
+                Path("parent/child").parent.toString.should.equal(
+                    "/tmp/parent");
+            }
 
             Path("~/test-dir").parent.toString.should.equal(
                 "~".expandTilde);
@@ -591,7 +649,10 @@ struct Path {
             result ~= p;
         }
 
-        result.should.equal([
+        import std.algorithm: sort;
+        import std.array: array;
+
+        result.sort.array.should.equal([
             root.join("d1", "d2"),
             root.join("d1", "d2", "test2.txt"),
             root.join("d1", "test1.txt"),
@@ -717,7 +778,11 @@ struct Path {
 
         std.file.getcwd.should.not.equal(root._path);
         root.chdir;
-        std.file.getcwd.should.equal(root._path);
+        version(OSX) {
+            std.file.getcwd.should.equal(root.realPath._path);
+        } else {
+            std.file.getcwd.should.equal(root._path);
+        }
 
         version(Posix) {
             // Prepare test dir in user's home directory
@@ -747,22 +812,40 @@ struct Path {
         root.join("my-dir", "other-dir").mkdir(true);
 
         // Check current path is not equal to root
-        Path.current.should.not.equal(root);
+        version (OSX) {
+            Path.current.should.not.equal(root.realPath);
+        } else {
+            Path.current.should.not.equal(root);
+        }
 
         // Change current working directory to test root, and check that it
         // was changed
         root.chdir;
-        Path.current.should.equal(root);
+        version (OSX) {
+            Path.current.should.equal(root.realPath);
+        } else {
+            Path.current.should.equal(root);
+        }
 
         // Try to change current working directory to "my-dir" inside our
         // test root dir
         root.chdir("my-dir");
-        Path.current.should.equal(root.join("my-dir"));
+        version (OSX) {
+            Path.current.should.equal(root.join("my-dir").realPath);
+        } else {
+            Path.current.should.equal(root.join("my-dir"));
+        }
 
         // Try to change current dir to some-sub-dir, and check if it works
         root.chdir(Path("my-dir", "some-dir", "some-sub-dir"));
-        Path.current.should.equal(
-            root.join("my-dir", "some-dir", "some-sub-dir"));
+
+        version(OSX) {
+            Path.current.should.equal(
+                root.join("my-dir", "some-dir", "some-sub-dir").realPath);
+        } else {
+            Path.current.should.equal(
+                root.join("my-dir", "some-dir", "some-sub-dir"));
+        }
     }
 
     /** Copy single file to destination.
@@ -875,22 +958,14 @@ struct Path {
             std.file.mkdirRecurse(dst_root._path);
             auto src_root = this.toAbsolute();
             foreach (Path src; src_root.walk(SpanMode.breadth)) {
+                enforce!PathException(
+                    src.isFile || src.isDir,
+                    "Cannot copy %s: it is not file nor directory.");
                 auto dst = dst_root.join(src.relativeTo(src_root));
-                if (src.isFile) {
+                if (src.isFile)
                     std.file.copy(src._path, dst._path);
-                } else if (src.isSymlink) {
-                    // TODO: Posix only
-                    if (src.readLink.exists) {
-                        std.file.copy(
-                            std.file.readLink(src._path),
-                            dst._path,
-                        );
-                    //} else {
-                        // Log info about broken symlink
-                    }
-                } else {
+                else
                     std.file.mkdirRecurse(dst._path);
-                }
             }
         } else {
             copyFileTo(dest);
@@ -1057,9 +1132,65 @@ struct Path {
             home_tmp.join("test-dir", "d2", "f2.txt").exists.should.be(true);
             home_tmp.join("test-dir", "d2", "f2.txt").isFile.should.be(true);
         }
+    }
+
+    /// Test behavior with symlinks
+    version(Posix) unittest {
+        import dshould;
+        auto cdir = std.file.getcwd;
+        Path root = createTempPath();
+        scope(exit) {
+            std.file.chdir(cdir);
+            root.remove();
+        }
+
+        // Create test dir with content to test copying non-empty directory
+        root.join("test-dir").mkdir();
+        root.join("test-dir", "f1.txt").writeFile("f1");
+        root.join("test-dir", "d2").mkdir();
+        root.join("test-dir", "d2", "f2.txt").writeFile("f2");
+        root.join("test-dir", "d2").symlink(root.join("test-dir", "d3-s"));
+        root.join("test-dir", "d2", "f2.txt").symlink(
+            root.join("test-dir", "f3.txt"));
 
 
+        // Test that test-dir content created
+        root.join("test-dir").exists.should.be(true);
+        root.join("test-dir").isDir.should.be(true);
+        root.join("test-dir", "f1.txt").exists.should.be(true);
+        root.join("test-dir", "f1.txt").isFile.should.be(true);
+        root.join("test-dir", "d2").exists.should.be(true);
+        root.join("test-dir", "d2").isDir.should.be(true);
+        root.join("test-dir", "d2").isSymlink.should.be(false);
+        root.join("test-dir", "d2", "f2.txt").exists.should.be(true);
+        root.join("test-dir", "d2", "f2.txt").isFile.should.be(true);
+        root.join("test-dir", "d3-s").exists.should.be(true);
+        root.join("test-dir", "d3-s").isDir.should.be(true);
+        root.join("test-dir", "d3-s").isSymlink.should.be(true);
+        root.join("test-dir", "f3.txt").exists.should.be(true);
+        root.join("test-dir", "f3.txt").isFile.should.be(true);
+        root.join("test-dir", "f3.txt").isSymlink.should.be(true);
 
+        // Copy non-empty dir to unexisting location
+        root.join("test-dir-cpy-1").exists.should.be(false);
+        root.join("test-dir").copyTo(root.join("test-dir-cpy-1"));
+
+        // Test that dir copied successfully
+        root.join("test-dir-cpy-1").exists.should.be(true);
+        root.join("test-dir-cpy-1").isDir.should.be(true);
+        root.join("test-dir-cpy-1", "f1.txt").exists.should.be(true);
+        root.join("test-dir-cpy-1", "f1.txt").isFile.should.be(true);
+        root.join("test-dir-cpy-1", "d2").exists.should.be(true);
+        root.join("test-dir-cpy-1", "d2").isDir.should.be(true);
+        root.join("test-dir-cpy-1", "d2", "f2.txt").exists.should.be(true);
+        root.join("test-dir-cpy-1", "d2", "f2.txt").isFile.should.be(true);
+        root.join("test-dir-cpy-1", "d3-s").exists.should.be(true);
+        root.join("test-dir-cpy-1", "d3-s").isDir.should.be(true);
+        root.join("test-dir-cpy-1", "d3-s").isSymlink.should.be(false);
+        root.join("test-dir-cpy-1", "f3.txt").exists.should.be(true);
+        root.join("test-dir-cpy-1", "f3.txt").isFile.should.be(true);
+        root.join("test-dir-cpy-1", "f3.txt").isSymlink.should.be(false);
+        root.join("test-dir-cpy-1", "f3.txt").readFileText.should.equal("f2");
     }
 
     /** Remove file or directory referenced by this path.
@@ -1270,7 +1401,14 @@ struct Path {
         root.join("test-dir").exists.should.be(false);
         root.join("test-dir", "subdir").exists.should.be(false);
 
-        root.join("test-dir", "subdir").mkdir().should.throwA!(std.file.FileException);
+        version(Posix) {
+            root.join("test-dir", "subdir").mkdir().should.throwA!(
+                std.file.FileException);
+        } else {
+            import std.windows.syserror;
+            root.join("test-dir", "subdir").mkdir().should.throwA!(
+                WindowsException);
+        }
 
         root.join("test-dir").mkdir();
         root.join("test-dir").exists.should.be(true);
@@ -1334,12 +1472,22 @@ struct Path {
         // Test that readlink and realpath works fine
         root.join("test-symlink.txt").readLink.should.equal(
             root.join("test-dir", "subdir", "test-file.txt"));
-        root.join("test-symlink.txt").realPath.should.equal(
-            root.join("test-dir", "subdir", "test-file.txt"));
+        version(OSX) {
+            root.join("test-symlink.txt").realPath.should.equal(
+                root.realPath.join("test-dir", "subdir", "test-file.txt"));
+        } else {
+            root.join("test-symlink.txt").realPath.should.equal(
+                root.join("test-dir", "subdir", "test-file.txt"));
+        }
         root.join("dirlink", "test-file.txt").readLink.should.equal(
             root.join("dirlink", "test-file.txt"));
-        root.join("dirlink", "test-file.txt").realPath.should.equal(
-            root.join("test-dir", "subdir", "test-file.txt"));
+        version(OSX) {
+            root.join("dirlink", "test-file.txt").realPath.should.equal(
+                root.realPath.join("test-dir", "subdir", "test-file.txt"));
+        } else {
+            root.join("dirlink", "test-file.txt").realPath.should.equal(
+                root.join("test-dir", "subdir", "test-file.txt"));
+        }
 
 
     }
@@ -1770,7 +1918,11 @@ struct Path {
         // (script have to print current working directory)
         auto status0 = root.join("test-script").execute(["hello", "world"]);
         status0.status.should.be(0);
-        status0.output.should.equal(root.toString ~ "\n");
+        version(OSX) {
+            status0.output.should.equal(root.realPath.toString ~ "\n");
+        } else {
+            status0.output.should.equal(root.toString ~ "\n");
+        }
 
         // Create some other directory
         auto my_dir = root.join("my-dir");
@@ -1782,7 +1934,11 @@ struct Path {
                 null,
                 my_dir.nullable);
         status1.status.should.be(0);
-        status1.output.should.equal(my_dir.toString ~ "\n");
+        version(OSX) {
+            status1.output.should.equal(my_dir.realPath.toString ~ "\n");
+        } else {
+            status1.output.should.equal(my_dir.toString ~ "\n");
+        }
 
         // Passs null path as workding direcotry for script
         auto status2 = root.join("test-script").execute(
@@ -1790,7 +1946,11 @@ struct Path {
                 null,
                 Nullable!Path.init);
         status2.status.should.be(0);
-        status2.output.should.equal(root.toString ~ "\n");
+        version(OSX) {
+            status2.output.should.equal(root.realPath.toString ~ "\n");
+        } else {
+            status2.output.should.equal(root.toString ~ "\n");
+        }
 
         // Passs my-dir as workding directory for script (without nullable)
         auto status3 = root.join("test-script").execute(
@@ -1798,7 +1958,11 @@ struct Path {
                 null,
                 my_dir);
         status3.status.should.be(0);
-        status3.output.should.equal(my_dir.toString ~ "\n");
+        version(OSX) {
+            status3.output.should.equal(my_dir.realPath.toString ~ "\n");
+        } else {
+            status3.output.should.equal(my_dir.toString ~ "\n");
+        }
 
     }
 
@@ -1814,12 +1978,12 @@ struct Path {
       *     Path to searched file, if such file was found.
       *     Otherwise return null Path.
       **/
-    version(Posix) @safe Nullable!Path searchFileUp(in string file_name) const {
+    @safe Nullable!Path searchFileUp(in string file_name) const {
         return searchFileUp(Path(file_name));
     }
 
     /// ditto
-    version(Posix) @safe Nullable!Path searchFileUp(in Path search_path) const {
+    @safe Nullable!Path searchFileUp(in Path search_path) const {
         Path current_path = toAbsolute;
         while (!current_path.isRoot) {
             auto dst_path = current_path.join(search_path);
@@ -1841,7 +2005,7 @@ struct Path {
     /** Example of searching configuration file, when you are somewhere inside
       * project.
       **/
-    version(Posix) unittest {
+    unittest {
         import dshould;
         Path root = createTempPath();
         scope(exit) root.remove();
@@ -1863,8 +2027,13 @@ struct Path {
         // Find config file. It sould be dir1/my-conf.conf
         auto p1 = Path.current.searchFileUp("my-conf.conf");
         p1.isNull.should.be(false);
-        p1.get.toString.should.equal(
-            root.join("dir1", "my-conf.conf").toAbsolute.toString);
+        version(OSX) {
+            p1.get.toString.should.equal(
+                root.join("dir1", "my-conf.conf").realPath.toString);
+        } else {
+            p1.get.toString.should.equal(
+                root.join("dir1", "my-conf.conf").toAbsolute.toString);
+        }
 
         // Try to get config, related to "dir8"
         auto p2 = root.join("dir1", "dir4", "dir8").searchFileUp(
