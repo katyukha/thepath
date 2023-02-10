@@ -8,10 +8,9 @@ static private import std.stdio;
 static private import std.process;
 static private import std.algorithm;
 private import std.typecons: Nullable, nullable;
-private import std.path: expandTilde;
 private import std.format: format;
 private import std.exception: enforce;
-private import thepath.utils: createTempPath, createTempDirectory;
+private import thepath.utils: createTempPath, createTempDirectory, expandTilde;
 private import thepath.exception: PathException;
 
 
@@ -26,7 +25,7 @@ private import thepath.exception: PathException;
       *    path = string representation of path to point to
       **/
     pure nothrow this(in string path) {
-        _path = path;
+        _path = path.dup;
     }
 
     /** Constructor that allows to build path from segments
@@ -51,7 +50,7 @@ private import thepath.exception: PathException;
     /** Check if path is valid.
       * Returns: true if this is valid path.
       **/
-    pure nothrow bool isValid() const {
+    pure nothrow auto isValid() const {
         return std.path.isValidPath(_path);
     }
 
@@ -69,7 +68,7 @@ private import thepath.exception: PathException;
     }
 
     /// Check if path is absolute
-    pure nothrow bool isAbsolute() const {
+    pure nothrow auto isAbsolute() const {
         return std.path.isAbsolute(_path);
     }
 
@@ -89,7 +88,7 @@ private import thepath.exception: PathException;
     }
 
     /// Check if path starts at root directory (or drive letter)
-    pure nothrow bool isRooted() const {
+    pure nothrow auto isRooted() const {
         return std.path.isRooted(_path);
     }
 
@@ -166,17 +165,17 @@ private import thepath.exception: PathException;
     }
 
     /// Determine if path is file.
-    bool isFile() const {
+    auto isFile() const {
         return std.file.isFile(_path.expandTilde);
     }
 
     /// Determine if path is directory.
-    bool isDir() const {
+    auto isDir() const {
         return std.file.isDir(_path.expandTilde);
     }
 
     /// Determine if path is symlink
-    bool isSymlink() const {
+    auto isSymlink() const {
         return std.file.isSymlink(_path.expandTilde);
     }
 
@@ -184,12 +183,6 @@ private import thepath.exception: PathException;
       * rules. They could be used for sorting of path array for example.
       **/
 	pure nothrow int opCmp(in Path other) const
-	{
-		return std.path.filenameCmp(this._path, other._path);
-	}
-
-	/// ditto
-	pure nothrow int opCmp(in ref Path other) const
 	{
 		return std.path.filenameCmp(this._path, other._path);
 	}
@@ -231,12 +224,6 @@ private import thepath.exception: PathException;
 	/** Override equality comparison operators
       **/
     pure nothrow bool opEquals(in Path other) const
-	{
-		return opCmp(other) == 0;
-	}
-
-	/// ditto
-	pure nothrow bool opEquals(in ref Path other) const
 	{
 		return opCmp(other) == 0;
 	}
@@ -344,7 +331,7 @@ private import thepath.exception: PathException;
     }
 
     /// Check if path exists
-    nothrow bool exists() const {
+    nothrow auto exists() const {
         return std.file.exists(_path.expandTilde);
     }
 
@@ -371,7 +358,7 @@ private import thepath.exception: PathException;
     }
 
     /// Return path as string
-    pure nothrow string toString() const {
+    pure nothrow auto toString() const {
         return _path;
     }
 
@@ -408,7 +395,7 @@ private import thepath.exception: PathException;
       *          normalization of path.
       * Throws: Exception if the specified base directory is not absolute.
       **/
-    Path toAbsolute() const {
+    auto toAbsolute() const {
         return Path(
             std.path.buildNormalizedPath(
                 std.path.absolutePath(_path.expandTilde)));
@@ -449,7 +436,7 @@ private import thepath.exception: PathException;
     /** Expand tilde (~) in current path.
       * Returns: New path with tilde expaded
       **/
-    nothrow Path expandTilde() const {
+    nothrow auto expandTilde() const {
         return Path(std.path.expandTilde(_path));
     }
 
@@ -478,12 +465,11 @@ private import thepath.exception: PathException;
       *     New path build from current path and provided segments
       **/
     pure nothrow auto join(in string[] segments...) const {
-        auto args=[_path] ~ segments;
-        return Path(std.path.buildPath(args));
+        return Path(std.path.buildPath([_path.dup] ~ segments));
     }
 
     /// ditto
-    pure nothrow Path join(in Path[] segments...) const {
+    pure nothrow auto join(in Path[] segments...) const {
         string[] args=[];
         foreach(p; segments) args ~= p._path;
         return this.join(args);
@@ -1611,7 +1597,7 @@ private import thepath.exception: PathException;
         // TODO: Add support to move files between filesystems
         enforce!PathException(
             !to.exists,
-            "Destination %s already exists!".format(to));
+            "Destination %s already exists!".format(to.toString));
         return std.file.rename(_path.expandTilde, to._path.expandTilde);
     }
 
@@ -2169,11 +2155,11 @@ private import thepath.exception: PathException;
     auto execute(in string[] args=[],
             in string[string] env=null,
             in Nullable!Path workDir=Nullable!Path.init,
-            in std.process.Config config=std.process.Config.none,
+            const std.process.Config config=std.process.Config.none,
             in size_t maxOutput=size_t.max) const {
         return std.process.execute(
             this._path ~ args,
-            env,
+            env.dup,
             config,
             maxOutput,
             (workDir.isNull) ? null : workDir.get.toString);
@@ -2183,7 +2169,7 @@ private import thepath.exception: PathException;
     auto execute(in string[] args,
             in string[string] env,
             in Path workDir,
-            in std.process.Config config=std.process.Config.none,
+            const std.process.Config config=std.process.Config.none,
             in size_t maxOutput=size_t.max) const {
         return execute(args, env, Nullable!Path(workDir), config, maxOutput);
     }
