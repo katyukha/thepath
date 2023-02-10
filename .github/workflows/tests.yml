@@ -20,4 +20,7 @@ jobs:
           compiler: ${{ matrix.dc }}
 
       - name: Run tests
-        run: dub test
+        run: dub test -b unittest-cov
+
+      - name: Upload coverage to codecov
+        uses: codecov/codecov-action@v3
