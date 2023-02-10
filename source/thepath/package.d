@@ -44,7 +44,12 @@ unittest {
     root.chdir("my-project");
 
     // Ensure that current directory now is my-project
-    Path.current.should.equal(root.join("my-project"));
+    version(OSX) {
+        Path.current.should.equal(
+            root.join("my-project").realPath);
+    } else {
+        Path.current.should.equal(root.join("my-project"));
+    }
 
     // Ensure that we can find path to config
     auto config1 = Path.current.searchFileUp("my-conf.conf");
@@ -56,8 +61,13 @@ unittest {
     root.chdir("my-project", "some-dir", "some-sub-dir");
 
     // Ensure that current directory now is my-project/some-dir/some-sub-dir
-    Path.current.should.equal(
-        root.join("my-project", "some-dir", "some-sub-dir"));
+    version(OSX) {
+        Path.current.should.equal(
+            root.join("my-project", "some-dir", "some-sub-dir").realPath);
+    } else {
+        Path.current.should.equal(
+            root.join("my-project", "some-dir", "some-sub-dir"));
+    }
 
     // Ensure that we can find path to config even if we someshere deep inside
     // our project tree

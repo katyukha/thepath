@@ -7,9 +7,16 @@ and [D port of pathlib](https://code.dlang.org/packages/pathlib) but
 implementing it in different way.
 
 ---
-[![pipeline status](https://gitlab.com/katyukha/thepath/badges/master/pipeline.svg)](https://gitlab.com/katyukha/thepath/-/commits/master)
+
+[![Github Actions](https://github.com/katyukha/thepath/actions/workflows/tests.yml/badge.svg)](https://github.com/katyukha/thepath/actions/workflows/tests.yml?branch=master)
+[![codecov](https://codecov.io/gh/katyukha/thepath/branch/master/graph/badge.svg?token=IUXBCNSHNQ)](https://codecov.io/gh/katyukha/thepath)
 [![DUB](https://img.shields.io/dub/v/thepath)](https://code.dlang.org/packages/thepath)
 ![DUB](https://img.shields.io/dub/l/thepath)
+
+![Ubuntu](https://img.shields.io/badge/Ubuntu-Latest-green?logo=Ubuntu)
+![Windows](https://img.shields.io/badge/Windows-Latest-green?logo=Windows)
+![MacOS](https://img.shields.io/badge/MacOS-Latest-green?logo=Apple)
+
 ---
 
 **NOTE**: this is alpha version, and api is still subject for change
