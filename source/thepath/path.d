@@ -15,7 +15,8 @@ private import thepath.utils: createTempPath, createTempDirectory;
 private import thepath.exception: PathException;
 
 
-/** Path - allows to easily work with path.
+/** Path - struct that represents single path object, and provides convenient
+  * interface to deal with filesystem paths.
   **/
 struct Path {
     private string _path;
@@ -47,6 +48,8 @@ struct Path {
     }
 
     invariant {
+        // TODO: it seems that this invariant is not needed.
+        //       Try to find test case when it is needed
         assert(_path !is null, "Attempt to use uninitialized path!");
     }
 

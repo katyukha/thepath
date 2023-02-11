@@ -22,7 +22,7 @@ implementing it in different way.
 **NOTE**: this is alpha version, and api is still subject for change
 
 Following ideas used in design of this lib:
-- Implement struct or class `Path` that have to represent
+- Implement struct `Path` that have to represent
   single path to file or directory.
 - Avoid implicit modification of created path as much as reasonably possible.
   Any operation on path have to create new instance of `Path`,
@@ -40,15 +40,8 @@ Following ideas used in design of this lib:
   to and from other paths (URL).
 - It is designed to work with file system paths of OS it is compiled for.
   Thus, there is no sense to work with windows-style paths under the linux, etc.
-  Are there any cases when such thing have to be supported?
 - This lib have to be well tested.
 
-**Warning**: Currently this lib is not tested on Windows or other platforms.
-So, it surelly works on Posix (tested on linux only), but possibly,
-it should work on other platforms too.
-If you want to help to make it crossplatform, then contact me (
-the first thing needed to make it cross platform, is to set up CI to run
-automated tests on other platforms).
 
 ## Features
 
@@ -87,7 +80,7 @@ automated tests on other platforms).
     - Do we need this feature?
       It seems that it is better to avoid implicit conversion to string,
       at least unless multiple `alias this` supported in D.
-- [ ] Add automated tests for Windows
+- [x] Add automated tests for Windows and MacOS
 - [ ] Add func to convert to stringz
 - Any other features needed?
 
