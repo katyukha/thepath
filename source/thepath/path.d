@@ -601,7 +601,10 @@ struct Path {
             if (result)
                 free(result);
         }
-        errnoEnforce(result);
+        // TODO: Better handle errors with different exceptions
+        //       See: https://man7.org/linux/man-pages/man3/realpath.3.html
+        // TODO: Add tests on behavior with broken symlinks
+        errnoEnforce(result, "Path.realPath raise error");
         return Path(to!(string)(result));
     }
 
@@ -1202,8 +1205,17 @@ struct Path {
       * removed
       **/
     @safe void remove() const {
-        if (isFile) std.file.remove(_path.expandTilde);
-        else std.file.rmdirRecurse(_path.expandTilde);
+        // TODO: Implement in better way
+        //       Implemented in this way, because isFile and isDir on broken
+        //       symlink raises error.
+        version(Posix) {
+            // This approach does not work on windows
+            if (isSymlink || isFile) std.file.remove(_path.expandTilde);
+            else std.file.rmdirRecurse(_path.expandTilde);
+        } else {
+            if (isDir) std.file.rmdirRecurse(_path.expandTilde);
+            else std.file.remove(_path.expandTilde);
+        }
     }
 
     ///
@@ -1269,6 +1281,36 @@ struct Path {
             home_tmp.join("test-dir", "d2").exists.should.be(false);
             home_tmp.join("test-dir", "d2", "f2.txt").exists.should.be(false);
         }
+    }
+
+    /// Test removing broken symlink
+    version(Posix) unittest {
+        import dshould;
+        Path root = createTempPath();
+        scope(exit) root.remove();
+
+        // Try to create test file
+        root.join("test-file.txt").exists.should.be(false);
+        root.join("test-file.txt").writeFile("test");
+        root.join("test-file.txt").exists.should.be(true);
+
+        // Create symlink to that file
+        root.join("test-file.txt").symlink(root.join("test-symlink.txt"));
+        root.join("test-symlink.txt").exists.should.be(true);
+
+        // Delete original file
+        root.join("test-file.txt").remove();
+
+        // Check that file was deleted, but symlink still exists
+        root.join("test-file.txt").exists.should.be(false);
+        root.join("test-symlink.txt").exists.should.be(true);
+
+        // Delete symlink
+        root.join("test-symlink.txt").remove();
+
+        // Test that symlink was deleted too
+        root.join("test-file.txt").exists.should.be(false);
+        root.join("test-symlink.txt").exists.should.be(false);
     }
 
     /** Rename current path.
