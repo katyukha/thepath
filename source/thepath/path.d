@@ -620,6 +620,8 @@ struct Path {
 
     /** Iterate over all files and directories inside path;
       *
+      * Produces rangs with absolute paths found inside specific directory
+      *
       * Params:
       *     mode = The way to traverse directories. See [docs](https://dlang.org/phobos/std_file.html#SpanMode)
       *     followSymlink = do we need to follow symlinks of not. By default set to True.
@@ -635,7 +637,7 @@ struct Path {
     auto walk(in SpanMode mode=SpanMode.shallow, bool followSymlink=true) const {
         import std.algorithm.iteration: map;
         return std.file.dirEntries(
-            _path, mode, followSymlink).map!(a => Path(a));
+            this.toAbsolute._path, mode, followSymlink).map!(a => Path(a));
     }
 
     ///
@@ -652,6 +654,39 @@ struct Path {
         // Walk through the derectory d1
         Path[] result;
         foreach(p; root.join("d1").walk(SpanMode.breadth)) {
+            result ~= p;
+        }
+
+        import std.algorithm: sort;
+        import std.array: array;
+
+        result.sort.array.should.equal([
+            root.join("d1", "d2"),
+            root.join("d1", "d2", "test2.txt"),
+            root.join("d1", "test1.txt"),
+        ]);
+    }
+
+    /// Walk inside tilda-expandable path
+    version(Posix) unittest {
+        import dshould;
+        import std.algorithm: startsWith;
+
+        // Prepare test dir in user's home directory
+        Path root = createTempPath("~", "tmp-d-test");
+        scope(exit) root.remove();
+
+        Path hroot = Path("~").join(root.relativeTo(std.path.expandTilde("~")));
+        hroot._path.startsWith("~").should.be(true);
+
+        // Create sample directory structure
+        hroot.join("d1", "d2").mkdir(true);
+        hroot.join("d1", "test1.txt").writeFile("Test 1");
+        hroot.join("d1", "d2", "test2.txt").writeFile("Test 2");
+
+        // Walk through the derectory d1
+        Path[] result;
+        foreach(p; hroot.join("d1").walk(SpanMode.breadth)) {
             result ~= p;
         }
 
