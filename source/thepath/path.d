@@ -44,6 +44,7 @@ struct Path {
         version(Posix) {
             Path("foo", "moo", "boo").toString.should.equal("foo/moo/boo");
             Path("/foo/moo", "boo").toString.should.equal("/foo/moo/boo");
+            Path("/", "foo", "moo").toString.should.equal("/foo/moo");
         }
     }
 
@@ -67,6 +68,7 @@ struct Path {
         Path("").isValid.should.be(false);
         Path(".").isValid.should.be(true);
         Path("some-path").isValid.should.be(true);
+        Path("test.txt").isValid.should.be(true);
     }
 
     /// Check if path is absolute
@@ -300,6 +302,17 @@ struct Path {
             Path.current.toString.should.equal(
                     root.join("dir1", "dir2", "dir3").toString);
         }
+    }
+
+    /// Get system's temp directory
+    @safe static Path tempDir() {
+        return Path(std.file.tempDir);
+    }
+
+    ///
+    unittest {
+        import dshould;
+        Path.tempDir._path.should.equal(std.file.tempDir);
     }
 
     /// Check if path exists
