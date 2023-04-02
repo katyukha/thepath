@@ -347,6 +347,31 @@ struct Path {
         return _path;
     }
 
+    /** Return path as 0-terminated string.
+      * Usually, could be used to interface with C libraries.
+      *
+      * Important Note: When passing a char* to a C function,
+      * and the C function keeps it around for any reason,
+      * make sure that you keep a reference to it in your D code.
+      * Otherwise, it may become invalid during a garbage collection
+      * cycle and cause a nasty bug when the C code tries to use it.
+      **/
+    @safe pure nothrow auto toStringz() const {
+        import std.string: toStringz;
+        return _path.toStringz;
+    }
+
+    ///
+    unittest {
+        import dshould;
+        import core.stdc.string: strlen;
+
+        auto p = Path("test");
+        auto sz = p.toStringz;
+
+        strlen(sz).should.equal(4);
+        sz[4].should.equal('\0');
+    }
 
     /** Convert path to absolute path.
       * Returns: new instance of Path that represents current path converted to
