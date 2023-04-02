@@ -81,7 +81,7 @@ Following ideas used in design of this lib:
       It seems that it is better to avoid implicit conversion to string,
       at least unless multiple `alias this` supported in D.
 - [x] Add automated tests for Windows and MacOS
-- [ ] Add func to convert to stringz
+- [x] Add func to convert to stringz
 - Any other features needed?
 
 
