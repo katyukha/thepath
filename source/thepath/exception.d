@@ -8,6 +8,3 @@ private import std.exception;
 class PathException : Exception {
     mixin basicExceptionCtors;
 }
-
-
-

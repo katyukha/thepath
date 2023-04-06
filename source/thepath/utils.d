@@ -1,11 +1,15 @@
 /// Utility functions to work with paths
 module thepath.utils;
 
-private import std.exception: enforce;
+private import std.exception: enforce, errnoEnforce;
 private static import std.path;
 
 private import thepath.exception: PathException;
 private import thepath.path: Path;
+
+
+// Max attempts to create temp directory
+private immutable ushort MAX_TMP_ATTEMPTS = 1000;
 
 
 /** Create temporary directory
@@ -17,7 +21,9 @@ private import thepath.path: Path;
   *         temp directory inside. Default: std.file.tempDir
   *     prefix = prefix to be used in name of temp directory. Default: "tmp"
   * Returns: string, representing path to created temporary directory
-  * Throws: PathException in case of error
+  * Throws:
+  *     ErrnoException (Posix) incase if mkdtemp was not able to create tempdir
+  *     PathException (Windows) in case of failure of creation of temp dir
   **/
 string createTempDirectory(in string prefix="tmp") {
     import std.file : tempDir;
@@ -41,17 +47,19 @@ string createTempDirectory(in string path, in string prefix) {
         // mkdtemp will modify tempname_str directly. and res is pointer to
         // tempname_str in case of success.
         char* res = mkdtemp(tempname_str.ptr);
-        enforce!PathException(
-            res !is null, "Cannot create temporary directory");
+        errnoEnforce(res !is null, "Cannot create temporary directory");
 
         // Converting to string will duplicate result.
         // But may be it have sense to do it in more obvious way
         // for example: return tempname_str[0..$-1].idup;
         return to!string(res.fromStringz);
-    } else {
+    } else version (Windows) {
         import std.ascii: letters;
         import std.random: uniform;
         import std.file;
+        import core.sys.windows.winerror;
+        import std.windows.syserror;
+        import std.format: format;
 
         // Generate new random temp path to test using provided path and prefix
         // as template.
@@ -62,15 +70,22 @@ string createTempDirectory(in string path, in string prefix) {
                 std.path.expandTilde(path), prefix ~ suffix);
         }
 
-        // TODO: Improve security of this approach by creating directory
-        //       and catching exception if directory already exists.
-        string temp_dir = generate_temp_dir();
-        while (std.file.exists(temp_dir)) {
-            temp_dir = generate_temp_dir();
+        for(ushort i=0; i<MAX_TMP_ATTEMPTS; i++) {
+            string temp_dir = generate_temp_dir();
+            try {
+                std.file.mkdir(temp_dir);
+            } catch (WindowsException e) {
+                if (e.code == ERROR_ALREADY_EXISTS)
+                    continue;
+                throw new PathException(
+                    "Cannot create temporary directory: %s".format(
+                        sysErrorString(e.code)));
+            }
+            return temp_dir;
         }
-        std.file.mkdir(temp_dir);
-        return temp_dir;
-    }
+        throw new PathException(
+            "Cannot create temporary directory: No usable name found!");
+    } else assert(0, "Not supported platform!");
 }
 
 
