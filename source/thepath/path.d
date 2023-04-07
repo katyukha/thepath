@@ -48,12 +48,6 @@ struct Path {
         }
     }
 
-    invariant {
-        // TODO: it seems that this invariant is not needed.
-        //       Try to find test case when it is needed
-        assert(_path !is null, "Attempt to use uninitialized path!");
-    }
-
     /** Check if path is valid.
       * Returns: true if this is valid path.
       **/
@@ -69,6 +63,9 @@ struct Path {
         Path(".").isValid.should.be(true);
         Path("some-path").isValid.should.be(true);
         Path("test.txt").isValid.should.be(true);
+
+        Path p;
+        p.isValid.should.be(false);
     }
 
     /// Check if path is absolute
@@ -83,6 +80,8 @@ struct Path {
         Path("").isAbsolute.should.be(false);
         Path(".").isAbsolute.should.be(false);
         Path("some-path").isAbsolute.should.be(false);
+
+        Path(null).isAbsolute.should.be(false);
 
         version(Posix) {
             Path("/test/path").isAbsolute.should.be(true);
@@ -147,6 +146,7 @@ struct Path {
 
         Path("my", "dir", "42").isInside(Path("my", "dir")).should.be(true);
         Path("my", "dir", "42").isInside(Path("oth", "dir")).should.be(false);
+        Path().isInside(Path("oth", "dir")).should.be(false);
     }
 
 
@@ -162,6 +162,7 @@ struct Path {
         import dshould;
 
         Path("t1", "t2", "t3").segments.should.equal(["t1", "t2", "t3"]);
+        Path(null).segments.empty.should.be(true);
     }
 
     /// Determine if path is file.

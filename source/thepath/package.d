@@ -102,30 +102,3 @@ unittest {
     auto const p2 = test_path_fn(Nullable!Path.init);
     p2.isNull.should.be(true);
 }
-
-
-/// Example of using paths in structs
-unittest {
-    import dshould;
-
-    struct PStruct {
-        string name;
-        Path path;
-
-        bool check() const {
-            return path.exists;
-        }
-    }
-
-    PStruct p;
-
-    p.name = "test";
-
-    // Attempt to run operation on uninitialized path will throw error
-    import core.exception: AssertError;
-    p.check.should.throwA!AssertError;
-
-    // Let's initialize path and check it again
-    p.path = Path("some-unexisting-path-to-magic-file");
-    p.check.should.be(false);
-}
