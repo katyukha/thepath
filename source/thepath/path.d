@@ -728,7 +728,7 @@ struct Path {
       *         writeln(p);
       * ---
       **/
-    auto walk(in SpanMode mode=SpanMode.shallow, bool followSymlink=true) const {
+    @safe auto walk(in SpanMode mode=SpanMode.shallow, bool followSymlink=true) const {
         import std.algorithm.iteration: map;
         return std.file.dirEntries(
             this.toAbsolute._path, mode, followSymlink).map!(a => Path(a));
@@ -795,12 +795,12 @@ struct Path {
     }
 
     /// Just an alias for walk(SpanModel.depth)
-    auto walkDepth(bool followSymlink=true) const {
+    @safe auto walkDepth(bool followSymlink=true) const {
         return walk(SpanMode.depth, followSymlink);
     }
 
     /// Just an alias for walk(SpanModel.breadth)
-    auto walkBreadth(bool followSymlink=true) const {
+    @safe auto walkBreadth(bool followSymlink=true) const {
         return walk(SpanMode.breadth, followSymlink);
     }
 
@@ -814,7 +814,7 @@ struct Path {
       *     Range of absolute path inside specified directory, that match
       *     specified glob pattern.
       **/
-    auto glob(in string pattern,
+    @safe auto glob(in string pattern,
             in SpanMode mode=SpanMode.shallow,
             bool followSymlink=true) {
         import std.algorithm.iteration: filter;
@@ -1077,7 +1077,7 @@ struct Path {
       * Throws:
       *     PathException when cannot copy
       **/
-    void copyTo(in Path dest) const {
+    @safe void copyTo(in Path dest) const {
         import std.stdio;
         if (isDir) {
             Path dst_root = dest.toAbsolute;
@@ -1108,7 +1108,7 @@ struct Path {
     }
 
     /// ditto
-    void copyTo(in string dest) const {
+    @safe void copyTo(in string dest) const {
         copyTo(Path(dest));
     }
 
