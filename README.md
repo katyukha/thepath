@@ -19,7 +19,7 @@ implementing it in different way.
 
 ---
 
-**NOTE**: this is alpha version, and api is still subject for change
+**NOTE**: this is beta version, and api may be changed in future
 
 Following ideas used in design of this lib:
 - Implement struct `Path` that have to represent
@@ -76,12 +76,6 @@ Following ideas used in design of this lib:
     - `Path("a") ~ Path("b") == Path("a").join(Path("b"))`
     - `Path("a") ~ "b" == Path("a").join("b")`
     - Do we need this? It seems that `Path("a").join("b", "c")` looks good enough.
-- [ ] Implement `alias this` feature to make it easily convertible to string.
-    - Do we need this feature?
-      It seems that it is better to avoid implicit conversion to string,
-      at least unless multiple `alias this` supported in D.
-- [x] Add automated tests for Windows and MacOS
-- [x] Add func to convert to stringz
 - Any other features needed?
 
 
