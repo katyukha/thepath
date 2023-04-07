@@ -250,13 +250,20 @@ struct Path {
         Path("a", "b").should.not.equal(Path("a", "c"));
     }
 
-    // Implement concatenation operstors
-    // Note, that appending to path returns path,
-    // but appending to string returns string
+    /** Concatenation operator for paths.
+      *
+      * - Concatenation of `Path` with `Path` will return `Path`
+      * - Concatenation of `Path` with `string` will return `Path`
+      * - Concatenation of `string` with `Path` will return `string`
+      **/
     @safe pure nothrow Path opBinary(string op : "~")(Path other) =>
         this.join(other);
+
+    /// ditto
     @safe pure nothrow Path opBinary(string op : "~")(string other) =>
         this.join(other);
+
+    /// ditto
     @safe pure nothrow string opBinaryRight(string op : "~")(string other) =>
         Path(other).join(this).toString;
 
@@ -386,7 +393,7 @@ struct Path {
         import dshould;
         import core.stdc.string: strlen;
 
-        auto p = Path("test");
+        const auto p = Path("test");
         auto sz = p.toStringz;
 
         strlen(sz).should.equal(4);
