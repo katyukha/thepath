@@ -18,14 +18,14 @@ private import thepath.exception: PathException;
 /** Path - struct that represents single path object, and provides convenient
   * interface to deal with filesystem paths.
   **/
-struct Path {
+@safe struct Path {
     private string _path;
 
     /** Main constructor to build new Path from string
       * Params:
       *    path = string representation of path to point to
       **/
-    @safe pure nothrow this(in string path) {
+    pure nothrow this(in string path) {
         _path = path;
     }
 
@@ -33,7 +33,7 @@ struct Path {
       * Params:
       *     segments = array of segments to build path from
       **/
-    @safe pure nothrow this(in string[] segments...) {
+    pure nothrow this(in string[] segments...) {
         _path = std.path.buildNormalizedPath(segments);
     }
 
@@ -51,7 +51,7 @@ struct Path {
     /** Check if path is valid.
       * Returns: true if this is valid path.
       **/
-    @safe pure nothrow bool isValid() const {
+    pure nothrow bool isValid() const {
         return std.path.isValidPath(_path);
     }
 
@@ -69,7 +69,7 @@ struct Path {
     }
 
     /// Check if path is absolute
-    @safe pure nothrow bool isAbsolute() const {
+    pure nothrow bool isAbsolute() const {
         return std.path.isAbsolute(_path);
     }
 
@@ -89,12 +89,12 @@ struct Path {
     }
 
     /// Check if path starts at root directory (or drive letter)
-    @safe pure nothrow bool isRooted() const {
+    pure nothrow bool isRooted() const {
         return std.path.isRooted(_path);
     }
 
     /// Check if current path is root (does not have parent)
-    @safe pure bool isRoot() const {
+    pure bool isRoot() const {
         import std.path: isDirSeparator;
 
         version(Posix) {
@@ -132,7 +132,7 @@ struct Path {
     }
 
     /// Check if current path is inside other path
-    @safe bool isInside(in Path other) const {
+    bool isInside(in Path other) const {
         // TODO: May be there is better way to check if path
         //       is inside another path
         return std.algorithm.startsWith(
@@ -153,7 +153,7 @@ struct Path {
     /** Split path on segments.
       * Under the hood, this method uses $(REF pathSplitter, std, path)
       **/
-    @safe pure auto segments() const {
+    pure auto segments() const {
         return std.path.pathSplitter(_path);
     }
 
@@ -166,30 +166,30 @@ struct Path {
     }
 
     /// Determine if path is file.
-    @safe bool isFile() const {
+    bool isFile() const {
         return std.file.isFile(_path.expandTilde);
     }
 
     /// Determine if path is directory.
-    @safe bool isDir() const {
+    bool isDir() const {
         return std.file.isDir(_path.expandTilde);
     }
 
     /// Determine if path is symlink
-    @safe bool isSymlink() const {
+    bool isSymlink() const {
         return std.file.isSymlink(_path.expandTilde);
     }
 
     /** Override comparison operators to use OS-specific case-sensitivity
       * rules. They could be used for sorting of path array for example.
       **/
-	@safe pure nothrow int opCmp(in Path other) const
+	pure nothrow int opCmp(in Path other) const
 	{
 		return std.path.filenameCmp(this._path, other._path);
 	}
 
 	/// ditto
-	@safe pure nothrow int opCmp(in ref Path other) const
+	pure nothrow int opCmp(in ref Path other) const
 	{
 		return std.path.filenameCmp(this._path, other._path);
 	}
@@ -230,13 +230,13 @@ struct Path {
 
 	/** Override equality comparison operators
       **/
-    @safe pure nothrow bool opEquals(in Path other) const
+    pure nothrow bool opEquals(in Path other) const
 	{
 		return opCmp(other) == 0;
 	}
 
 	/// ditto
-	@safe pure nothrow bool opEquals(in ref Path other) const
+	pure nothrow bool opEquals(in ref Path other) const
 	{
 		return opCmp(other) == 0;
 	}
@@ -257,15 +257,15 @@ struct Path {
       * - Concatenation of `Path` with `string` will return `Path`
       * - Concatenation of `string` with `Path` will return `string`
       **/
-    @safe pure nothrow Path opBinary(string op : "~")(Path other) =>
+    pure nothrow Path opBinary(string op : "~")(Path other) =>
         this.join(other);
 
     /// ditto
-    @safe pure nothrow Path opBinary(string op : "~")(string other) =>
+    pure nothrow Path opBinary(string op : "~")(string other) =>
         this.join(other);
 
     /// ditto
-    @safe pure nothrow string opBinaryRight(string op : "~")(string other) =>
+    pure nothrow string opBinaryRight(string op : "~")(string other) =>
         Path(other).join(this).toString;
 
     /// Test concatenation operators
@@ -281,12 +281,12 @@ struct Path {
     /** Compute hash of the Path to be able to use it as key
       * in asociative arrays.
       **/
-    @safe nothrow size_t toHash() const {
+    nothrow size_t toHash() const {
         return typeid(_path).getHash(&_path);
     }
 
     ///
-    unittest {
+    @system unittest {
         import dshould;
 
         string[Path] arr;
@@ -301,7 +301,7 @@ struct Path {
     }
 
     /// Return current path (as absolute path)
-    @safe static Path current() {
+    static Path current() {
         return Path(".").toAbsolute;
     }
 
@@ -333,7 +333,7 @@ struct Path {
     }
 
     /// Get system's temp directory
-    @safe static Path tempDir() {
+    static Path tempDir() {
         return Path(std.file.tempDir);
     }
 
@@ -344,7 +344,7 @@ struct Path {
     }
 
     /// Check if path exists
-    @safe nothrow bool exists() const {
+    nothrow bool exists() const {
         return std.file.exists(_path.expandTilde);
     }
 
@@ -371,7 +371,7 @@ struct Path {
     }
 
     /// Return path as string
-    @safe pure nothrow string toString() const {
+    pure nothrow string toString() const {
         return _path;
     }
 
@@ -384,13 +384,13 @@ struct Path {
       * Otherwise, it may become invalid during a garbage collection
       * cycle and cause a nasty bug when the C code tries to use it.
       **/
-    @safe pure nothrow auto toStringz() const {
+    pure nothrow auto toStringz() const {
         import std.string: toStringz;
         return _path.toStringz;
     }
 
     ///
-    unittest {
+    @system unittest {
         import dshould;
         import core.stdc.string: strlen;
 
@@ -408,7 +408,7 @@ struct Path {
       *          normalization of path.
       * Throws: Exception if the specified base directory is not absolute.
       **/
-    @safe Path toAbsolute() const {
+    Path toAbsolute() const {
         return Path(
             std.path.buildNormalizedPath(
                 std.path.absolutePath(_path.expandTilde)));
@@ -448,14 +448,14 @@ struct Path {
     /** Expand tilde (~) in current path.
       * Returns: New path with tilde expaded
       **/
-    @safe nothrow Path expandTilde() const {
+    nothrow Path expandTilde() const {
         return Path(std.path.expandTilde(_path));
     }
 
     /** Normalize path.
       * Returns: new normalized Path.
       **/
-    @safe pure nothrow Path normalize() const {
+    pure nothrow Path normalize() const {
         return Path(std.path.buildNormalizedPath(_path));
     }
 
@@ -476,13 +476,13 @@ struct Path {
       * Returns:
       *     New path build from current path and provided segments
       **/
-    @safe pure nothrow auto join(in string[] segments...) const {
+    pure nothrow auto join(in string[] segments...) const {
         auto args=[_path] ~ segments;
         return Path(std.path.buildPath(args));
     }
 
     /// ditto
-    @safe pure nothrow Path join(in Path[] segments...) const {
+    pure nothrow Path join(in Path[] segments...) const {
         string[] args=[];
         foreach(p; segments) args ~= p._path;
         return this.join(args);
@@ -516,7 +516,7 @@ struct Path {
       * Returns:
       *     Absolute Path to parent directory.
       **/
-    @safe Path parent() const {
+    Path parent() const {
         if (isAbsolute()) {
             return Path(std.path.dirName(_path));
         } else {
@@ -562,7 +562,7 @@ struct Path {
       * Throws:
       *     PathException if base path is not valid or not absolute
       **/
-    @safe pure Path relativeTo(in Path base) const {
+    pure Path relativeTo(in Path base) const {
         enforce!PathException(
             base.isValid && base.isAbsolute,
             "Base path must be valid and absolute");
@@ -570,12 +570,12 @@ struct Path {
     }
 
     /// ditto
-    @safe pure Path relativeTo(in string base) const {
+    pure Path relativeTo(in string base) const {
         return relativeTo(Path(base));
     }
 
     ///
-    unittest {
+    @system unittest {
         import dshould;
         Path("foo").relativeTo(std.file.getcwd).toString().should.equal("foo");
 
@@ -595,12 +595,12 @@ struct Path {
     }
 
     /// Returns extension for current path
-    @safe pure nothrow string extension() const {
+    pure nothrow string extension() const {
         return std.path.extension(_path);
     }
 
     /// Returns base name of current path
-    @safe pure nothrow string baseName() const {
+    pure nothrow string baseName() const {
         return std.path.baseName(_path);
     }
 
@@ -613,12 +613,12 @@ struct Path {
     }
 
     /// Return size of file specified by path
-    @safe ulong getSize() const {
+    ulong getSize() const {
         return std.file.getSize(_path.expandTilde);
     }
 
     ///
-    unittest {
+    @system unittest {
         import dshould;
         Path root = createTempPath();
         scope(exit) root.remove();
@@ -642,7 +642,7 @@ struct Path {
       * Available only for posix systems.
       * If path is not symlink, then return it unchanged
       **/
-    version(Posix) @safe Path readLink() const {
+    version(Posix) Path readLink() const {
         if (isSymlink()) {
             return Path(std.file.readLink(_path.expandTilde));
         } else {
@@ -678,7 +678,7 @@ struct Path {
     }
 
     ///
-    version(Posix) @safe unittest {
+    version(Posix) unittest {
         import dshould;
 
         Path root = createTempPath();
@@ -701,7 +701,7 @@ struct Path {
     }
 
     ///
-    version(Posix) unittest {
+    version(Posix) @system unittest {
         import dshould;
 
         import std.exception: ErrnoException;
@@ -718,7 +718,7 @@ struct Path {
       * - https://en.wikipedia.org/wiki/Glob_%28programming%29
       * - https://dlang.org/phobos/std_path.html#globMatch
       **/
-    @safe pure nothrow bool matchGlob(in string pattern) {
+    pure nothrow bool matchGlob(in string pattern) {
         return std.path.globMatch(_path, pattern);
     }
 
@@ -738,14 +738,14 @@ struct Path {
       *         writeln(p);
       * ---
       **/
-    @safe auto walk(in SpanMode mode=SpanMode.shallow, bool followSymlink=true) const {
+    auto walk(in SpanMode mode=SpanMode.shallow, bool followSymlink=true) const {
         import std.algorithm.iteration: map;
         return std.file.dirEntries(
             this.toAbsolute._path, mode, followSymlink).map!(a => Path(a));
     }
 
     ///
-    @safe unittest {
+    unittest {
         import dshould;
         Path root = createTempPath();
         scope(exit) root.remove();
@@ -805,12 +805,12 @@ struct Path {
     }
 
     /// Just an alias for walk(SpanModel.depth)
-    @safe auto walkDepth(bool followSymlink=true) const {
+    auto walkDepth(bool followSymlink=true) const {
         return walk(SpanMode.depth, followSymlink);
     }
 
     /// Just an alias for walk(SpanModel.breadth)
-    @safe auto walkBreadth(bool followSymlink=true) const {
+    auto walkBreadth(bool followSymlink=true) const {
         return walk(SpanMode.breadth, followSymlink);
     }
 
@@ -824,7 +824,7 @@ struct Path {
       *     Range of absolute path inside specified directory, that match
       *     specified glob pattern.
       **/
-    @safe auto glob(in string pattern,
+    auto glob(in string pattern,
             in SpanMode mode=SpanMode.shallow,
             bool followSymlink=true) {
         import std.algorithm.iteration: filter;
@@ -834,7 +834,7 @@ struct Path {
     }
 
     ///
-    @safe unittest {
+    unittest {
         import dshould;
         import std.array: array;
         import std.algorithm: sort;
@@ -872,7 +872,7 @@ struct Path {
     }
 
     /// Change current working directory to this.
-    @safe void chdir() const {
+    void chdir() const {
         std.file.chdir(_path.expandTilde);
     }
 
@@ -881,7 +881,7 @@ struct Path {
       * Params:
       *     sub_path = relative path inside this, to change directory to
       **/
-    @safe void chdir(in string[] sub_path...) const
+    void chdir(in string[] sub_path...) const
     in {
         assert(
             sub_path.length > 0,
@@ -898,7 +898,7 @@ struct Path {
     }
 
     /// ditto
-    @safe void chdir(in Path sub_path) const
+    void chdir(in Path sub_path) const
     in {
         assert(
             !sub_path.isAbsolute,
@@ -1010,7 +1010,7 @@ struct Path {
       *         if destination already exists and
       *         it is not a directory and rewrite is set to false.
       **/
-    @safe void copyFileTo(in Path dest, in bool rewrite=false) const {
+    void copyFileTo(in Path dest, in bool rewrite=false) const {
         enforce!PathException(
             this.exists,
             "Cannot Copy! Source file %s does not exists!".format(_path));
@@ -1029,7 +1029,7 @@ struct Path {
     }
 
     ///
-    unittest {
+    @system unittest {
         import dshould;
 
         // Prepare temporary path for test
@@ -1087,7 +1087,7 @@ struct Path {
       * Throws:
       *     PathException when cannot copy
       **/
-    @safe void copyTo(in Path dest) const {
+    void copyTo(in Path dest) const {
         import std.stdio;
         if (isDir) {
             Path dst_root = dest.toAbsolute;
@@ -1118,12 +1118,12 @@ struct Path {
     }
 
     /// ditto
-    @safe void copyTo(in string dest) const {
+    void copyTo(in string dest) const {
         copyTo(Path(dest));
     }
 
     ///
-    unittest {
+    @system unittest {
         import dshould;
         auto cdir = std.file.getcwd;
         Path root = createTempPath();
@@ -1343,7 +1343,7 @@ struct Path {
       * then directory itself and all content inside referenced dir will be
       * removed
       **/
-    @safe void remove() const {
+    void remove() const {
         // TODO: Implement in better way
         //       Implemented in this way, because isFile and isDir on broken
         //       symlink raises error.
@@ -1358,7 +1358,7 @@ struct Path {
     }
 
     ///
-    unittest {
+    @system unittest {
         import dshould;
         Path root = createTempPath();
         scope(exit) root.remove();
@@ -1459,7 +1459,7 @@ struct Path {
       * Throws:
       *     PathException when destination already exists
       **/
-    @safe void rename(in Path to) const {
+    void rename(in Path to) const {
         // TODO: Add support to move files between filesystems
         enforce!PathException(
             !to.exists,
@@ -1468,12 +1468,12 @@ struct Path {
     }
 
     /// ditto
-    @safe void rename(in string to) const {
+    void rename(in string to) const {
         return rename(Path(to));
     }
 
     ///
-    unittest {
+    @system unittest {
         import dshould;
         Path root = createTempPath();
         scope(exit) root.remove();
@@ -1571,13 +1571,13 @@ struct Path {
       * Throws:
       *     FileException if cannot create dir (it already exists)
       **/
-    @safe void mkdir(in bool recursive=false) const {
+    void mkdir(in bool recursive=false) const {
         if (recursive) std.file.mkdirRecurse(std.path.expandTilde(_path));
         else std.file.mkdir(std.path.expandTilde(_path));
     }
 
     ///
-    unittest {
+    @system unittest {
         import dshould;
         Path root = createTempPath();
         scope(exit) root.remove();
@@ -1627,7 +1627,7 @@ struct Path {
       * Throws:
       *     FileException
       **/
-    version(Posix) @safe void symlink(in Path dest) const {
+    version(Posix) void symlink(in Path dest) const {
         std.file.symlink(_path, dest._path);
     }
 
@@ -1684,7 +1684,7 @@ struct Path {
       * Returns:
       *     std.stdio.File struct
       **/
-    @safe std.stdio.File openFile(in string openMode = "rb") const {
+    std.stdio.File openFile(in string openMode = "rb") const {
         static import std.stdio;
 
         return std.stdio.File(_path.expandTilde, openMode);
@@ -1712,12 +1712,12 @@ struct Path {
       * Throws:
       *     FileException in case of  error
       **/
-    @safe void writeFile(in void[] buffer) const {
+    void writeFile(in void[] buffer) const {
         return std.file.write(_path.expandTilde, buffer);
     }
 
     ///
-    unittest {
+    @system unittest {
         import dshould;
         Path root = createTempPath();
         scope(exit) root.remove();
@@ -1746,12 +1746,12 @@ struct Path {
       * Throws:
       *     FileException in case of  error
       **/
-    @safe void appendFile(in void[] buffer) const {
+    void appendFile(in void[] buffer) const {
         return std.file.append(_path.expandTilde, buffer);
     }
 
     ///
-    unittest {
+    @system unittest {
         import dshould;
         Path root = createTempPath();
         scope(exit) root.remove();
@@ -1784,12 +1784,12 @@ struct Path {
       * Throws:
       *     FileException in case of error
       **/
-    @safe auto readFile(size_t upTo=size_t.max) const {
+    auto readFile(size_t upTo=size_t.max) const {
         return std.file.read(_path.expandTilde, upTo);
     }
 
     ///
-    unittest {
+    @system unittest {
         import dshould;
         Path root = createTempPath();
         scope(exit) root.remove();
@@ -1833,7 +1833,7 @@ struct Path {
       *     $(LREF FileException) if there is an error reading the file,
       *     $(REF UTFException, std, utf) on UTF decoding error.
       **/
-    @safe auto readFileText(S=string)() const {
+    auto readFileText(S=string)() const {
         return std.file.readText!S(_path.expandTilde);
     }
 
@@ -1869,7 +1869,7 @@ struct Path {
       *  Returns:
       *      uint - represening attributes of the file
       **/
-    @safe auto getAttributes() const {
+    auto getAttributes() const {
         return std.file.getAttributes(_path.expandTilde);
     }
 
@@ -1907,7 +1907,7 @@ struct Path {
       *     false if at lease one bit specified by attributes is not set.
       *
       **/
-    @safe bool hasAttributes(in uint attributes) const {
+    bool hasAttributes(in uint attributes) const {
         return (this.getAttributes() & attributes) == attributes;
 
     }
@@ -1953,7 +1953,7 @@ struct Path {
       *      attributes = value representing attributes to set on path.
       **/
 
-    @safe void setAttributes(in uint attributes) const {
+    void setAttributes(in uint attributes) const {
         std.file.setAttributes(_path, attributes);
     }
 
@@ -2018,7 +2018,7 @@ struct Path {
       * Returns:
       *     An $(D std.typecons.Tuple!(int, "status", string, "output")).
       **/
-    @safe auto execute(in string[] args=[],
+    auto execute(in string[] args=[],
             in string[string] env=null,
             in Nullable!Path workDir=Nullable!Path.init,
             in std.process.Config config=std.process.Config.none,
@@ -2032,7 +2032,7 @@ struct Path {
     }
 
     /// ditto
-    @safe auto execute(in string[] args,
+    auto execute(in string[] args,
             in string[string] env,
             in Path workDir,
             in std.process.Config config=std.process.Config.none,
@@ -2162,12 +2162,12 @@ struct Path {
       *     Path to searched file, if such file was found.
       *     Otherwise return null Path.
       **/
-    @safe Nullable!Path searchFileUp(in string file_name) const {
+    Nullable!Path searchFileUp(in string file_name) const {
         return searchFileUp(Path(file_name));
     }
 
     /// ditto
-    @safe Nullable!Path searchFileUp(in Path search_path) const {
+    Nullable!Path searchFileUp(in Path search_path) const {
         Path current_path = toAbsolute;
         while (!current_path.isRoot) {
             auto dst_path = current_path.join(search_path);
@@ -2189,7 +2189,7 @@ struct Path {
     /** Example of searching configuration file, when you are somewhere inside
       * project.
       **/
-    unittest {
+    @system unittest {
         import dshould;
         Path root = createTempPath();
         scope(exit) root.remove();
