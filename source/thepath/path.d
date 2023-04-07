@@ -659,7 +659,7 @@ struct Path {
       * Throws:
       *     ErrnoException in case if path cannot be resolved
       **/
-    version(Posix) Path realPath() const {
+    version(Posix) @trusted Path realPath() const {
         import core.sys.posix.stdlib : realpath;
         import core.stdc.stdlib: free;
         import std.string: toStringz, fromStringz;
@@ -678,10 +678,8 @@ struct Path {
     }
 
     ///
-    version(Posix) unittest {
+    version(Posix) @safe unittest {
         import dshould;
-
-        import std.exception: ErrnoException;
 
         Path root = createTempPath();
         scope(exit) root.remove();
@@ -700,6 +698,18 @@ struct Path {
             root.realPath.join("test-dir", "d2"));
         root.join("test-dir", "f3.txt").realPath.should.equal(
             root.realPath.join("test-dir", "d2", "f2.txt"));
+    }
+
+    ///
+    version(Posix) unittest {
+        import dshould;
+
+        import std.exception: ErrnoException;
+
+        Path root = createTempPath();
+        scope(exit) root.remove();
+
+        // realpath on unexisting path must throw error
         root.join("test-dir", "bad-path").realPath.should.throwA!ErrnoException;
     }
 
@@ -735,7 +745,7 @@ struct Path {
     }
 
     ///
-    unittest {
+    @safe unittest {
         import dshould;
         Path root = createTempPath();
         scope(exit) root.remove();
@@ -824,7 +834,7 @@ struct Path {
     }
 
     ///
-    unittest {
+    @safe unittest {
         import dshould;
         import std.array: array;
         import std.algorithm: sort;

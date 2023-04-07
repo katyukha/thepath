@@ -14,7 +14,7 @@ public import thepath.utils: createTempDirectory, createTempPath;
 public import thepath.exception: PathException;
 
 /// Example to find configuration of current project
-unittest {
+@safe unittest {
     import dshould;
 
     Path root = createTempPath();
@@ -78,7 +78,7 @@ unittest {
 
 
 /// Example of using nullable paths as function parameters
-unittest {
+@safe unittest {
     import dshould;
 
     import std.typecons: Nullable, nullable;
