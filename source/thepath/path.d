@@ -250,6 +250,26 @@ struct Path {
         Path("a", "b").should.not.equal(Path("a", "c"));
     }
 
+    // Implement concatenation operstors
+    // Note, that appending to path returns path,
+    // but appending to string returns string
+    @safe pure nothrow Path opBinary(string op : "~")(Path other) =>
+        this.join(other);
+    @safe pure nothrow Path opBinary(string op : "~")(string other) =>
+        this.join(other);
+    @safe pure nothrow string opBinaryRight(string op : "~")(string other) =>
+        Path(other).join(this).toString;
+
+    /// Test concatenation operators
+    unittest {
+        import dshould;
+
+        (Path("a") ~ "b").should.equal(Path("a", "b"));
+        (Path("a") ~ Path("b")).should.equal(Path("a", "b"));
+
+        ("a" ~ Path("b")).should.equal("a" ~ std.path.dirSeparator ~ "b");
+    }
+
     /** Compute hash of the Path to be able to use it as key
       * in asociative arrays.
       **/

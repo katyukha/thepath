@@ -71,11 +71,6 @@ Following ideas used in design of this lib:
 
 ## To Do
 
-
-- [ ] Override operators join paths, to be able to do things like:
-    - `Path("a") ~ Path("b") == Path("a").join(Path("b"))`
-    - `Path("a") ~ "b" == Path("a").join("b")`
-    - Do we need this? It seems that `Path("a").join("b", "c")` looks good enough.
 - Any other features needed?
 
 
