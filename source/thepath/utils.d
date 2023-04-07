@@ -25,17 +25,20 @@ private immutable ushort MAX_TMP_ATTEMPTS = 1000;
   *     ErrnoException (Posix) incase if mkdtemp was not able to create tempdir
   *     PathException (Windows) in case of failure of creation of temp dir
   **/
-string createTempDirectory(in string prefix="tmp") {
+@safe string createTempDirectory(in string prefix="tmp") {
     import std.file : tempDir;
     return createTempDirectory(tempDir, prefix);
 }
 
 /// ditto
-string createTempDirectory(in string path, in string prefix) {
+@safe string createTempDirectory(in string path, in string prefix) {
     version(Posix) {
         import std.string : fromStringz;
         import std.conv: to;
         import core.sys.posix.stdlib : mkdtemp;
+
+        // Make trusted version of mkdtemp
+        char* t_mkdtemp(scope char* tmpl) @trusted nothrow => mkdtemp(tmpl);
 
         // Prepare template for mkdtemp function.
         // It have to be mutable array of chars ended with zero to be compatibale
@@ -44,15 +47,15 @@ string createTempDirectory(in string path, in string prefix) {
             std.path.expandTilde(path),
             prefix ~ "-XXXXXX").dup ~ "\0";
 
-        // mkdtemp will modify tempname_str directly. and res is pointer to
-        // tempname_str in case of success.
-        char* res = mkdtemp(tempname_str.ptr);
+        // mkdtemp will modify tempname_str directly.
+        // and res will be pointer to tempname_str in case of success.
+        // in case of failure, res will be set to null.
+        char* res = t_mkdtemp(&tempname_str[0]);
         errnoEnforce(res !is null, "Cannot create temporary directory");
 
-        // Converting to string will duplicate result.
-        // But may be it have sense to do it in more obvious way
-        // for example: return tempname_str[0..$-1].idup;
-        return to!string(res.fromStringz);
+        // Convert tempname to string.
+        // Just remove trailing \0 symbol, and duplicate.
+        return tempname_str[0 .. $-1].idup;
     } else version (Windows) {
         import std.ascii: letters;
         import std.random: uniform;
@@ -70,16 +73,25 @@ string createTempDirectory(in string path, in string prefix) {
                 std.path.expandTilde(path), prefix ~ suffix);
         }
 
+        // Make trusted funcs to get windows error code and msg
+        auto get_err_code(WindowsException e) @trusted {
+            return e.code;
+        }
+        string get_err_str(WindowsException e) @trusted {
+            return sysErrorString(e.code);
+        }
+
+        // Try to create new temp directory
         for(ushort i=0; i<MAX_TMP_ATTEMPTS; i++) {
             string temp_dir = generate_temp_dir();
             try {
                 std.file.mkdir(temp_dir);
             } catch (WindowsException e) {
-                if (e.code == ERROR_ALREADY_EXISTS)
+                if (get_err_code(e) == ERROR_ALREADY_EXISTS)
                     continue;
                 throw new PathException(
                     "Cannot create temporary directory: %s".format(
-                        sysErrorString(e.code)));
+                        get_err_str(e)));
             }
             return temp_dir;
         }
@@ -100,18 +112,16 @@ string createTempDirectory(in string path, in string prefix) {
   * Returns: Path to created temp directory
   * Throws: PathException in case of error
   **/
-Path createTempPath(in string prefix="tmp") {
+@safe Path createTempPath(in string prefix="tmp") {
     return Path(createTempDirectory(prefix));
 }
 
 /// ditto
-Path createTempPath(in string path, in string prefix) {
+@safe Path createTempPath(in string path, in string prefix) {
     return Path(createTempDirectory(path, prefix));
 }
 
 /// ditto
-Path createTempPath(in Path path, in string prefix) {
+@safe Path createTempPath(in Path path, in string prefix) {
     return createTempPath(path.toString, prefix);
 }
-
-
