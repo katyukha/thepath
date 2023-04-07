@@ -100,6 +100,18 @@ private immutable ushort MAX_TMP_ATTEMPTS = 1000;
     } else assert(0, "Not supported platform!");
 }
 
+version(Posix) @system unittest {
+    import dshould;
+    import std.exception;
+    createTempDirectory("/some/unexisting/path").should.throwA!ErrnoException;
+}
+
+version(Windows) @system unittest {
+    import dshould;
+    import std.exception;
+    createTempDirectory("/some/unexisting/path").should.throwA!PathException;
+}
+
 
 /** Create temporary directory
   * Note, that caller is responsible to remove created directory.
