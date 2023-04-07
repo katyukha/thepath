@@ -653,27 +653,55 @@ struct Path {
     /** Get real path with all symlinks resolved.
       * If any segment of path is symlink, then this method will automatically
       * resolve that segment.
+      *
+      * Returns:
+      *     Path with all symlinks resolved
+      * Throws:
+      *     ErrnoException in case if path cannot be resolved
       **/
     version(Posix) Path realPath() const {
         import core.sys.posix.stdlib : realpath;
         import core.stdc.stdlib: free;
         import std.string: toStringz, fromStringz;
         import std.exception: errnoEnforce;
-        import std.conv: to;
 
-        auto conv_path = _path.toStringz;
-        auto result = realpath(conv_path, null);
+        const char* conv_path = _path.toStringz;
+        char* result = realpath(conv_path, null);
         scope (exit) {
             if (result)
                 free(result);
         }
-        // TODO: Better handle errors with different exceptions
-        //       See: https://man7.org/linux/man-pages/man3/realpath.3.html
+
         // TODO: Add tests on behavior with broken symlinks
-        errnoEnforce(result, "Path.realPath raise error");
-        return Path(to!(string)(result));
+        errnoEnforce(result, "Cannot get realpath for %s".format(_path));
+        return Path(result.fromStringz.idup);
     }
 
+    ///
+    version(Posix) unittest {
+        import dshould;
+
+        import std.exception: ErrnoException;
+
+        Path root = createTempPath();
+        scope(exit) root.remove();
+
+        // Create test dir with content to test copying non-empty directory
+        root.join("test-dir").mkdir();
+        root.join("test-dir", "f1.txt").writeFile("f1");
+        root.join("test-dir", "d2").mkdir();
+        root.join("test-dir", "d2", "f2.txt").writeFile("f2");
+        root.join("test-dir", "d2").symlink(root.join("test-dir", "d3-s"));
+        root.join("test-dir", "d2", "f2.txt").symlink(
+            root.join("test-dir", "f3.txt"));
+
+        // Test realpath
+        root.join("test-dir", "d3-s").realPath.should.equal(
+            root.realPath.join("test-dir", "d2"));
+        root.join("test-dir", "f3.txt").realPath.should.equal(
+            root.realPath.join("test-dir", "d2", "f2.txt"));
+        root.join("test-dir", "bad-path").realPath.should.throwA!ErrnoException;
+    }
 
     /** Check if path matches specified glob pattern.
       * See Also:
