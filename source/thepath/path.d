@@ -726,6 +726,8 @@ private import thepath.exception: PathException;
       *
       * Produces rangs with absolute paths found inside specific directory
       *
+      * Warning: system, becuase leads to build error without dip1000 preview flag
+      *
       * Params:
       *     mode = The way to traverse directories. See [docs](https://dlang.org/phobos/std_file.html#SpanMode)
       *     followSymlink = do we need to follow symlinks of not. By default set to True.
@@ -738,14 +740,16 @@ private import thepath.exception: PathException;
       *         writeln(p);
       * ---
       **/
-    auto walk(in SpanMode mode=SpanMode.shallow, bool followSymlink=true) const {
+    @system auto walk(in SpanMode mode=SpanMode.shallow, bool followSymlink=true) const {
+        // TODO: find the way to make it safe even without dip1000 preview,
+        //       or the way to handle both cases (dip1000 and no dip1000)
         import std.algorithm.iteration: map;
         return std.file.dirEntries(
             this.toAbsolute._path, mode, followSymlink).map!(a => Path(a));
     }
 
     ///
-    unittest {
+    @system unittest {
         import dshould;
         Path root = createTempPath();
         scope(exit) root.remove();
@@ -772,7 +776,7 @@ private import thepath.exception: PathException;
     }
 
     /// Walk inside tilda-expandable path
-    version(Posix) unittest {
+    @system version(Posix) unittest {
         import dshould;
         import std.algorithm: startsWith;
 
@@ -805,12 +809,12 @@ private import thepath.exception: PathException;
     }
 
     /// Just an alias for walk(SpanModel.depth)
-    auto walkDepth(bool followSymlink=true) const {
+    @system auto walkDepth(bool followSymlink=true) const {
         return walk(SpanMode.depth, followSymlink);
     }
 
     /// Just an alias for walk(SpanModel.breadth)
-    auto walkBreadth(bool followSymlink=true) const {
+    @system auto walkBreadth(bool followSymlink=true) const {
         return walk(SpanMode.breadth, followSymlink);
     }
 
@@ -824,7 +828,7 @@ private import thepath.exception: PathException;
       *     Range of absolute path inside specified directory, that match
       *     specified glob pattern.
       **/
-    auto glob(in string pattern,
+    @system auto glob(in string pattern,
             in SpanMode mode=SpanMode.shallow,
             bool followSymlink=true) {
         import std.algorithm.iteration: filter;
@@ -834,7 +838,7 @@ private import thepath.exception: PathException;
     }
 
     ///
-    unittest {
+    @system unittest {
         import dshould;
         import std.array: array;
         import std.algorithm: sort;
@@ -1087,7 +1091,7 @@ private import thepath.exception: PathException;
       * Throws:
       *     PathException when cannot copy
       **/
-    void copyTo(in Path dest) const {
+    @system void copyTo(in Path dest) const {
         import std.stdio;
         if (isDir) {
             Path dst_root = dest.toAbsolute;
@@ -1118,7 +1122,7 @@ private import thepath.exception: PathException;
     }
 
     /// ditto
-    void copyTo(in string dest) const {
+    @system void copyTo(in string dest) const {
         copyTo(Path(dest));
     }
 
@@ -1280,7 +1284,7 @@ private import thepath.exception: PathException;
     }
 
     /// Test behavior with symlinks
-    version(Posix) unittest {
+    version(Posix) @system unittest {
         import dshould;
         auto cdir = std.file.getcwd;
         Path root = createTempPath();
