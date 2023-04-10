@@ -18,6 +18,9 @@ jobs:
         with:
           compiler: ${{ matrix.dc }}
 
+      - name: Try to build the lib
+        run: dub build
+
       - name: Run tests
         run: dub test -b unittest-cov
 
