@@ -900,11 +900,19 @@ private import thepath.exception: PathException;
         root.join("d1").chdir;
 
         // Try to find txt files inside current directory
-        Path(".").walk("*.txt", SpanMode.breadth).array.sort.array.should.equal([
-            root.join("d1", "d2", "test6.txt"),
-            root.join("d1", "test1.txt"),
-            root.join("d1", "test2.txt"),
-        ]);
+        version(OSX) {
+            Path(".").walk("*.txt", SpanMode.breadth).array.sort.array.should.equal([
+                root.realPath.join("d1", "d2", "test6.txt"),
+                root.realPath.join("d1", "test1.txt"),
+                root.realPath.join("d1", "test2.txt"),
+            ]);
+        } else {
+            Path(".").walk("*.txt", SpanMode.breadth).array.sort.array.should.equal([
+                root.join("d1", "d2", "test6.txt"),
+                root.join("d1", "test1.txt"),
+                root.join("d1", "test2.txt"),
+            ]);
+        }
     }
 
 
@@ -979,11 +987,19 @@ private import thepath.exception: PathException;
         scope(exit) current.chdir;
 
         root.join("d1").chdir;
-        Path(".").glob("*.txt", SpanMode.breadth).array.sort.array.should.equal([
-            root.join("d1", "d2", "test6.txt"),
-            root.join("d1", "test1.txt"),
-            root.join("d1", "test2.txt"),
-        ]);
+        version(OSX) {
+            Path(".").glob("*.txt", SpanMode.breadth).array.sort.array.should.equal([
+                root.realPath.join("d1", "d2", "test6.txt"),
+                root.realPath.join("d1", "test1.txt"),
+                root.realPath.join("d1", "test2.txt"),
+            ]);
+        } else {
+            Path(".").glob("*.txt", SpanMode.breadth).array.sort.array.should.equal([
+                root.join("d1", "d2", "test6.txt"),
+                root.join("d1", "test1.txt"),
+                root.join("d1", "test2.txt"),
+            ]);
+        }
     }
 
     /// Change current working directory to this.
