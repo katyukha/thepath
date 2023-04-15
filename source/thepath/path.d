@@ -441,7 +441,8 @@ private import thepath.exception: PathException;
             string home_path = "~".expandTilde;
             home_path[0].should.equal('/');
 
-            Path("~/my/path").toAbsolute.toString.should.equal("%s/my/path".format(home_path));
+            Path("~/my/path").toAbsolute.toString.should.equal(
+                "%s/my/path".format(home_path));
         }
     }
 
@@ -599,6 +600,15 @@ private import thepath.exception: PathException;
         return std.path.extension(_path);
     }
 
+    ///
+    unittest {
+        import dshould;
+
+        Path("foo").extension.should.equal("");
+        Path("foo.moo").extension.should.equal(".moo");
+        Path("foo.moo.zoo").extension.should.equal(".zoo");
+    }
+
     /// Returns base name of current path
     pure nothrow string baseName() const {
         return std.path.baseName(_path);
@@ -724,11 +734,19 @@ private import thepath.exception: PathException;
 
     /** Iterate over all files and directories inside path;
       *
-      * Produces rangs with absolute paths found inside specific directory
+      * Produces range with absolute paths found inside specific directory.
+      *
+      * Optionally, it is possible to provide glob-patternt, and in this case
+      * only paths that match this pattern will be returned.
+      *
+      * Note, that, the difference between `walk` and `glob` methods is following:
+      * `walk` method applies pattern to absolute path,
+      * `glob` method applies pattern to paths relative to this path.
       *
       * Warning: system, becuase leads to build error without dip1000 preview flag
       *
       * Params:
+      *     pattern = The glob pattern to apply to paths inside current dir.
       *     mode = The way to traverse directories. See [docs](https://dlang.org/phobos/std_file.html#SpanMode)
       *     followSymlink = do we need to follow symlinks of not. By default set to True.
       *
@@ -746,6 +764,15 @@ private import thepath.exception: PathException;
         import std.algorithm.iteration: map;
         return std.file.dirEntries(
             this.toAbsolute._path, mode, followSymlink).map!(a => Path(a));
+    }
+
+    /// ditto
+    @system auto walk(in string pattern, in SpanMode mode=SpanMode.shallow, bool followSymlink=true) const {
+        // TODO: find the way to make it safe even without dip1000 preview,
+        //       or the way to handle both cases (dip1000 and no dip1000)
+        import std.algorithm.iteration: map;
+        return std.file.dirEntries(
+            this.toAbsolute._path, pattern, mode, followSymlink).map!(a => Path(a));
     }
 
     ///
@@ -813,12 +840,79 @@ private import thepath.exception: PathException;
         return walk(SpanMode.depth, followSymlink);
     }
 
+    /// ditto
+    @system auto walkDepth(in string pattern, bool followSymlink=true) const {
+        return walk(pattern, SpanMode.depth, followSymlink);
+    }
+
     /// Just an alias for walk(SpanModel.breadth)
     @system auto walkBreadth(bool followSymlink=true) const {
         return walk(SpanMode.breadth, followSymlink);
     }
 
+    /// ditto
+    @system auto walkBreadth(in string pattern, bool followSymlink=true) const {
+        return walk(pattern, SpanMode.breadth, followSymlink);
+    }
+
+    ///
+    @system unittest {
+        import dshould;
+        import std.array: array;
+        import std.algorithm: sort;
+        Path root = createTempPath();
+        scope(exit) root.remove();
+
+        // Create sample directory structure
+        root.join("d1").mkdir(true);
+        root.join("d1", "d2").mkdir(true);
+        root.join("d1", "test1.txt").writeFile("Test 1");
+        root.join("d1", "test2.txt").writeFile("Test 2");
+        root.join("d1", "test3.py").writeFile("print('Test 3')");
+        root.join("d1", "d2", "test4.py").writeFile("print('Test 4')");
+        root.join("d1", "d2", "test5.py").writeFile("print('Test 5')");
+        root.join("d1", "d2", "test6.txt").writeFile("print('Test 6')");
+
+        // Find py files in directory d1
+        root.join("d1").walk("*.py").array.should.equal([
+            root.join("d1", "test3.py"),
+        ]);
+
+        // Find py files in directory d1 recursively
+        root.join("d1").walk("*.py", SpanMode.breadth).array.sort.array.should.equal([
+            root.join("d1", "d2", "test4.py"),
+            root.join("d1", "d2", "test5.py"),
+            root.join("d1", "test3.py"),
+        ]);
+
+        // Find py files in directory d1 recursively
+        root.join("d1").walk("*.txt", SpanMode.breadth).array.sort.array.should.equal([
+            root.join("d1", "d2", "test6.txt"),
+            root.join("d1", "test1.txt"),
+            root.join("d1", "test2.txt"),
+        ]);
+
+        // Save current directory
+        auto current = Path.current;
+        scope(exit) current.chdir;
+
+        // Switch current directory to d1
+        root.join("d1").chdir;
+
+        // Try to find txt files inside current directory
+        Path(".").walk("*.txt", SpanMode.breadth).array.sort.array.should.equal([
+            root.join("d1", "d2", "test6.txt"),
+            root.join("d1", "test1.txt"),
+            root.join("d1", "test2.txt"),
+        ]);
+    }
+
+
     /** Search files that match provided glob pattern inside current path.
+      *
+      * Note, that, the difference between `walk` and `glob` methods is following:
+      * `walk` method applies pattern to absolute path,
+      * `glob` method applies pattern to paths relative to this path.
       *
       * Params:
       *     pattern = The glob pattern to apply to paths inside current dir.
@@ -867,8 +961,25 @@ private import thepath.exception: PathException;
             root.join("d1", "test3.py"),
         ]);
 
+        // This will match .py files inside d1 directory and d2 directory
+        root.glob("d*/*.py", SpanMode.breadth).array.sort.array.should.equal([
+            root.join("d1", "d2", "test4.py"),
+            root.join("d1", "d2", "test5.py"),
+            root.join("d1", "test3.py"),
+        ]);
+
         // Find py files in directory d1 recursively
         root.join("d1").glob("*.txt", SpanMode.breadth).array.sort.array.should.equal([
+            root.join("d1", "d2", "test6.txt"),
+            root.join("d1", "test1.txt"),
+            root.join("d1", "test2.txt"),
+        ]);
+
+        auto current = Path.current;
+        scope(exit) current.chdir;
+
+        root.join("d1").chdir;
+        Path(".").glob("*.txt", SpanMode.breadth).array.sort.array.should.equal([
             root.join("d1", "d2", "test6.txt"),
             root.join("d1", "test1.txt"),
             root.join("d1", "test2.txt"),
