@@ -609,6 +609,23 @@ private import thepath.exception: PathException;
         Path("foo.moo.zoo").extension.should.equal(".zoo");
     }
 
+    /// Returns path concatenated with provided extension
+    pure nothrow Path withExt(in string ext) {
+        if (ext.length > 1 && ext[0] == '.')
+            return Path(_path ~ ext);
+        if (ext.length > 0)
+            return Path(_path ~ "." ~ ext);
+        return this;
+    }
+
+    /// Example of withExt
+    unittest {
+        import dshould;
+
+        Path("foo").withExt(".txt").toString.should.equal("foo.txt");
+        Path("foo").withExt("txt").toString.should.equal("foo.txt");
+    }
+
     /// Returns base name of current path
     pure nothrow string baseName() const {
         return std.path.baseName(_path);
