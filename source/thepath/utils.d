@@ -12,6 +12,13 @@ private import thepath.path: Path;
 private immutable ushort MAX_TMP_ATTEMPTS = 1000;
 
 
+// Custom implementation to handle scoped input path
+package @safe nothrow string expandTilde(in string inputPath) {
+    // TODO: find the way to remove dup here
+    return std.path.expandTilde(inputPath.dup);
+}
+
+
 /** Create temporary directory
   * Note, that caller is responsible to remove created directory.
   * The temp directory will be created inside specified path.
@@ -43,9 +50,9 @@ private immutable ushort MAX_TMP_ATTEMPTS = 1000;
         // Prepare template for mkdtemp function.
         // It have to be mutable array of chars ended with zero to be compatibale
         // with mkdtemp function.
-        scope char[] tempname_str = std.path.buildNormalizedPath(
-            std.path.expandTilde(path),
-            prefix ~ "-XXXXXX").dup ~ "\0";
+        char[] tempname_str = std.path.buildNormalizedPath(
+            expandTilde(path),
+            prefix ~ "-XXXXXX").dup ~ '\0';
 
         // mkdtemp will modify tempname_str directly.
         // and res will be pointer to tempname_str in case of success.
@@ -70,7 +77,7 @@ private immutable ushort MAX_TMP_ATTEMPTS = 1000;
             string suffix = "-";
             for(ubyte i; i<6; i++) suffix ~= letters[uniform(0, $)];
             return std.path.buildNormalizedPath(
-                std.path.expandTilde(path), prefix ~ suffix);
+                expandTilde(path), prefix ~ suffix);
         }
 
         // Make trusted funcs to get windows error code and msg
