@@ -26,7 +26,7 @@ private import thepath.exception: PathException;
       *    path = string representation of path to point to
       **/
     pure nothrow this(in string path) {
-        _path = path;
+        _path = path.dup;
     }
 
     /** Constructor that allows to build path from segments
@@ -51,7 +51,7 @@ private import thepath.exception: PathException;
     /** Check if path is valid.
       * Returns: true if this is valid path.
       **/
-    pure nothrow bool isValid() const {
+    pure nothrow auto isValid() const {
         return std.path.isValidPath(_path);
     }
 
@@ -69,7 +69,7 @@ private import thepath.exception: PathException;
     }
 
     /// Check if path is absolute
-    pure nothrow bool isAbsolute() const {
+    pure nothrow auto isAbsolute() const {
         return std.path.isAbsolute(_path);
     }
 
@@ -89,12 +89,12 @@ private import thepath.exception: PathException;
     }
 
     /// Check if path starts at root directory (or drive letter)
-    pure nothrow bool isRooted() const {
+    pure nothrow auto isRooted() const {
         return std.path.isRooted(_path);
     }
 
     /// Check if current path is root (does not have parent)
-    pure bool isRoot() const {
+    pure auto isRoot() const {
         import std.path: isDirSeparator;
 
         version(Posix) {
@@ -132,7 +132,7 @@ private import thepath.exception: PathException;
     }
 
     /// Check if current path is inside other path
-    bool isInside(in Path other) const {
+    auto isInside(in Path other) const {
         // TODO: May be there is better way to check if path
         //       is inside another path
         return std.algorithm.startsWith(
@@ -166,17 +166,17 @@ private import thepath.exception: PathException;
     }
 
     /// Determine if path is file.
-    bool isFile() const {
+    auto isFile() const {
         return std.file.isFile(_path.expandTilde);
     }
 
     /// Determine if path is directory.
-    bool isDir() const {
+    auto isDir() const {
         return std.file.isDir(_path.expandTilde);
     }
 
     /// Determine if path is symlink
-    bool isSymlink() const {
+    auto isSymlink() const {
         return std.file.isSymlink(_path.expandTilde);
     }
 
@@ -184,12 +184,6 @@ private import thepath.exception: PathException;
       * rules. They could be used for sorting of path array for example.
       **/
 	pure nothrow int opCmp(in Path other) const
-	{
-		return std.path.filenameCmp(this._path, other._path);
-	}
-
-	/// ditto
-	pure nothrow int opCmp(in ref Path other) const
 	{
 		return std.path.filenameCmp(this._path, other._path);
 	}
@@ -231,12 +225,6 @@ private import thepath.exception: PathException;
 	/** Override equality comparison operators
       **/
     pure nothrow bool opEquals(in Path other) const
-	{
-		return opCmp(other) == 0;
-	}
-
-	/// ditto
-	pure nothrow bool opEquals(in ref Path other) const
 	{
 		return opCmp(other) == 0;
 	}
@@ -344,7 +332,7 @@ private import thepath.exception: PathException;
     }
 
     /// Check if path exists
-    nothrow bool exists() const {
+    nothrow auto exists() const {
         return std.file.exists(_path.expandTilde);
     }
 
@@ -371,7 +359,7 @@ private import thepath.exception: PathException;
     }
 
     /// Return path as string
-    pure nothrow string toString() const {
+    pure nothrow auto toString() const {
         return _path;
     }
 
@@ -408,7 +396,7 @@ private import thepath.exception: PathException;
       *          normalization of path.
       * Throws: Exception if the specified base directory is not absolute.
       **/
-    Path toAbsolute() const {
+    auto toAbsolute() const {
         return Path(
             std.path.buildNormalizedPath(
                 std.path.absolutePath(_path.expandTilde)));
@@ -478,7 +466,7 @@ private import thepath.exception: PathException;
       *     New path build from current path and provided segments
       **/
     pure nothrow auto join(in string[] segments...) const {
-        auto args=[_path] ~ segments;
+        auto args=[_path.dup] ~ segments;
         return Path(std.path.buildPath(args));
     }
 
@@ -2100,7 +2088,6 @@ private import thepath.exception: PathException;
       *  Params:
       *      attributes = value representing attributes to set on path.
       **/
-
     void setAttributes(in uint attributes) const {
         std.file.setAttributes(_path, attributes);
     }
@@ -2166,10 +2153,13 @@ private import thepath.exception: PathException;
       * Returns:
       *     An $(D std.typecons.Tuple!(int, "status", string, "output")).
       **/
-    auto execute(in string[] args=[],
-            in string[string] env=null,
+    deprecated(
+        "Use std.process.execute directly. " ~
+        "Also, another lib for running processess will be implemented later")
+     auto execute(in string[] args=[],
+            string[string] env=null,
             in Nullable!Path workDir=Nullable!Path.init,
-            in std.process.Config config=std.process.Config.none,
+            std.process.Config config=std.process.Config.none,
             in size_t maxOutput=size_t.max) const {
         return std.process.execute(
             this._path ~ args,
@@ -2180,122 +2170,15 @@ private import thepath.exception: PathException;
     }
 
     /// ditto
+    deprecated(
+        "Use std.process.execute directly. " ~
+        "Also, another lib for running processess will be implemented later")
     auto execute(in string[] args,
-            in string[string] env,
+            string[string] env,
             in Path workDir,
-            in std.process.Config config=std.process.Config.none,
+            std.process.Config config=std.process.Config.none,
             in size_t maxOutput=size_t.max) const {
         return execute(args, env, Nullable!Path(workDir), config, maxOutput);
-    }
-
-
-    /// Example of running execute to run simple script
-    version(Posix) unittest {
-        import dshould;
-        import std.conv: octal;
-        Path root = createTempPath();
-        scope(exit) root.remove();
-
-        // Create simple test script that will print its arguments
-        root.join("test-script").writeFile(
-            "#!/usr/bin/env bash\necho \"$@\";");
-
-        // Add permission to run this script
-        root.join("test-script").setAttributes(octal!755);
-
-        // Run test script without args
-        auto status1 = root.join("test-script").execute;
-        status1.status.should.be(0);
-        status1.output.should.equal("\n");
-
-        auto status2 = root.join("test-script").execute(["hello", "world"]);
-        status2.status.should.be(0);
-        status2.output.should.equal("hello world\n");
-
-        auto status3 = root.join("test-script").execute(["hello", "world\nplus"]);
-        status3.status.should.be(0);
-        status3.output.should.equal("hello world\nplus\n");
-
-        auto status4 = root.join("test-script").execute(
-                ["hello", "world"],
-                null,
-                root.nullable);
-        status4.status.should.be(0);
-        status4.output.should.equal("hello world\n");
-    }
-
-    /// Example of running execute to run script that will print
-    /// current working directory
-    version(Posix) unittest {
-        import dshould;
-        import std.conv: octal;
-
-        const Path current_dir = Path.current;
-        scope(exit) current_dir.chdir;
-
-        Path root = createTempPath();
-        scope(exit) root.remove();
-
-        // Create simple test script that will print its arguments
-        root.join("test-script").writeFile(
-            "#!/usr/bin/env bash\npwd;");
-
-        // Add permission to run this script
-        root.join("test-script").setAttributes(octal!755);
-
-        // Change current working directory to our root;
-        root.chdir;
-
-        // Do not pass current working directory
-        // (script have to print current working directory)
-        auto status0 = root.join("test-script").execute(["hello", "world"]);
-        status0.status.should.be(0);
-        version(OSX) {
-            status0.output.should.equal(root.realPath.toString ~ "\n");
-        } else {
-            status0.output.should.equal(root.toString ~ "\n");
-        }
-
-        // Create some other directory
-        auto my_dir = root.join("my-dir");
-        my_dir.mkdir();
-
-        // Passs my-dir as workding directory for script
-        auto status1 = root.join("test-script").execute(
-                ["hello", "world"],
-                null,
-                my_dir.nullable);
-        status1.status.should.be(0);
-        version(OSX) {
-            status1.output.should.equal(my_dir.realPath.toString ~ "\n");
-        } else {
-            status1.output.should.equal(my_dir.toString ~ "\n");
-        }
-
-        // Passs null path as workding direcotry for script
-        auto status2 = root.join("test-script").execute(
-                ["hello", "world"],
-                null,
-                Nullable!Path.init);
-        status2.status.should.be(0);
-        version(OSX) {
-            status2.output.should.equal(root.realPath.toString ~ "\n");
-        } else {
-            status2.output.should.equal(root.toString ~ "\n");
-        }
-
-        // Passs my-dir as workding directory for script (without nullable)
-        auto status3 = root.join("test-script").execute(
-                ["hello", "world"],
-                null,
-                my_dir);
-        status3.status.should.be(0);
-        version(OSX) {
-            status3.output.should.equal(my_dir.realPath.toString ~ "\n");
-        } else {
-            status3.output.should.equal(my_dir.toString ~ "\n");
-        }
-
     }
 
     /** Search file by name in current directory and parent directories.

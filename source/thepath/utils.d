@@ -45,7 +45,7 @@ private immutable ushort MAX_TMP_ATTEMPTS = 1000;
         // with mkdtemp function.
         scope char[] tempname_str = std.path.buildNormalizedPath(
             std.path.expandTilde(path),
-            prefix ~ "-XXXXXX").dup ~ "\0";
+            prefix ~ "-XXXXXX").dup ~ '\0';
 
         // mkdtemp will modify tempname_str directly.
         // and res will be pointer to tempname_str in case of success.
