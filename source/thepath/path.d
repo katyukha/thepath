@@ -131,10 +131,18 @@ private import thepath.exception: PathException;
         Path("").isRoot.should.be(false);
     }
 
-    /// Check if current path is inside other path
+    /** Check if current path is inside other path
+      *
+      * Note, that this method compares paths converted to absolute paths.
+      *
+      * Params:
+      *     other = Path to cher if current path is inside
+      **/
     auto isInside(in Path other) const {
         // TODO: May be there is better way to check if path
         //       is inside another path
+        // TODO: It will be good to do this check without converting paths
+        //       to absolute.
         return std.algorithm.startsWith(
             this.toAbsolute.segments,
             other.toAbsolute.segments);
