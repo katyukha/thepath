@@ -501,21 +501,44 @@ private import thepath.exception: PathException;
     }
 
 
-    /** determine parent path of this path
+    /** Determine parent path of this path.
+      *
+      * Note, by default, if path is not absolute,
+      * then it will be automatically converted
+      * to absolute path, before getting parent path.
+      *
+      * If parameter absolute is set to false, then
+      * base path will not be converted to absolute path before computing.
+      * On attempt to get parent out of scope, the Path(".") will be returned.
+      * For example:
+      *     Path("test").parent(false) == Path(".")
+      *     Path("test",  "..").parent(false) == Path(".")
+      *     Path("test", "..", "..").parent(false) == Path(".")
+      *     Path("test",  "test2").parent(false) == Path("test")
+      *
+      * Params:
+      *     absolute = covert path to absolute (if needed) before computing
+      *         parent path.
+      *
       * Returns:
-      *     Absolute Path to parent directory.
+      *     Path to parent directory.
       **/
-    Path parent() const {
-        if (isAbsolute()) {
+    Path parent(in bool absolute=true) const {
+        import std.array: array;
+
+        if (isAbsolute())
             return Path(std.path.dirName(_path));
-        } else {
+
+        if (absolute)
             return this.toAbsolute.parent;
-        }
+
+        return Path(std.path.dirName(_path));
     }
 
     ///
     unittest {
         import dshould;
+
         version(Posix) {
             Path("/tmp").parent.toString.should.equal("/");
             Path("/").parent.toString.should.equal("/");
@@ -541,6 +564,24 @@ private import thepath.exception: PathException;
                 "~".expandTilde);
         }
     }
+
+    /// Compute parent path without converting to absolute path
+    unittest {
+        import dshould;
+
+        Path("tmp", "dir").parent(false).should.equal(Path("tmp"));
+        Path("tmp").parent(false).should.equal(Path("."));
+
+        Path("tmp").parent(false).parent(false).should.equal(Path("."));
+        Path("").parent(false).parent(false).should.equal(Path("."));
+        Path("test").parent(false).should.equal(Path("."));
+        Path("test",  "..").parent(false).should.equal(Path("."));
+        Path("test", "..", "..").parent(false).should.equal(Path("."));
+        Path("test",  "test2").parent(false).should.equal(Path("test"));
+        Path("test",  "test2").parent(false).join("test3").should.equal(
+            Path("test", "test3"));
+    }
+
 
     /** Return this path as relative to base
       * Params:
