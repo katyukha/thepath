@@ -67,6 +67,9 @@ Following ideas used in design of this lib:
     - `Path("my-path").readFile()`
 - support search by glob-pattern
     - `foreach(path; Path.current.glob("*.py")) writeln(p.toString);`
+- easy access to some standard directories via Path's static methods:
+    - `Path.current` - returns path to current working directory
+    - `Path.tempDir` - returns path to default temporary directory
 
 
 ## To Do

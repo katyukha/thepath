@@ -63,6 +63,7 @@ private import thepath.exception: PathException;
         Path(".").isValid.should.be(true);
         Path("some-path").isValid.should.be(true);
         Path("test.txt").isValid.should.be(true);
+        Path(null).isValid.should.be(false);
 
         Path p;
         p.isValid.should.be(false);
@@ -474,7 +475,7 @@ private import thepath.exception: PathException;
       *     New path build from current path and provided segments
       **/
     pure nothrow auto join(in string[] segments...) const {
-        auto args=[_path.dup] ~ segments;
+        auto args=[_path.idup] ~ segments;
         return Path(std.path.buildPath(args));
     }
 
@@ -647,7 +648,7 @@ private import thepath.exception: PathException;
     }
 
     /// Returns path concatenated with provided extension
-    pure nothrow Path withExt(in string ext) {
+    pure nothrow Path withExt(in string ext) const {
         if (ext.length > 1 && ext[0] == '.')
             return Path(_path ~ ext);
         if (ext.length > 0)
@@ -947,7 +948,7 @@ private import thepath.exception: PathException;
         ]);
 
         // Save current directory
-        auto current = Path.current;
+        const auto current = Path.current;
         scope(exit) current.chdir;
 
         // Switch current directory to d1
@@ -1037,7 +1038,7 @@ private import thepath.exception: PathException;
             root.join("d1", "test2.txt"),
         ]);
 
-        auto current = Path.current;
+        const auto current = Path.current;
         scope(exit) current.chdir;
 
         root.join("d1").chdir;
