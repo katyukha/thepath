@@ -2190,47 +2190,6 @@ private import thepath.exception: PathException;
         root.join("test-file.txt").hasAttributes(S_IXOTH).should.be(false);
     }
 
-    /** Execute the file pointed by path
-      *
-      * Params:
-      *     args = arguments to be passed to program
-      *     env = associative array that represent environment variables
-      *        to be passed to program pointed by path
-      *     workDir = Working directory for new process.
-      *     config = Parameters for process creation.
-      *        See See $(REF Config, std, process)
-      *     maxOutput = Max bytes of output to be captured
-      * Returns:
-      *     An $(D std.typecons.Tuple!(int, "status", string, "output")).
-      **/
-    deprecated(
-        "Use std.process.execute directly. " ~
-        "Also, another lib for running processess will be implemented later")
-     auto execute(in string[] args=[],
-            string[string] env=null,
-            in Nullable!Path workDir=Nullable!Path.init,
-            std.process.Config config=std.process.Config.none,
-            in size_t maxOutput=size_t.max) const {
-        return std.process.execute(
-            this._path ~ args,
-            env,
-            config,
-            maxOutput,
-            (workDir.isNull) ? null : workDir.get.toString);
-    }
-
-    /// ditto
-    deprecated(
-        "Use std.process.execute directly. " ~
-        "Also, another lib for running processess will be implemented later")
-    auto execute(in string[] args,
-            string[string] env,
-            in Path workDir,
-            std.process.Config config=std.process.Config.none,
-            in size_t maxOutput=size_t.max) const {
-        return execute(args, env, Nullable!Path(workDir), config, maxOutput);
-    }
-
     /** Search file by name in current directory and parent directories.
       * Usually, this could be used to find project config,
       * when current directory is somewhere inside project.
