@@ -340,6 +340,25 @@ private import thepath.exception: PathException;
         Path.tempDir._path.should.equal(std.file.tempDir);
     }
 
+    /** Returns a temporary file create by std.stdio.File.tmpfile method.
+      *
+      * Note that the created file has no name.
+      **/
+    static auto tempFile() {
+        return std.stdio.File.tmpfile;
+    }
+
+    ///
+    unittest {
+        import dshould;
+
+        auto f = Path.tempFile;
+        f.write("Hello World\n");
+        f.flush();
+        f.rewind();
+        f.readln().should.equal("Hello World\n");
+    }
+
     /// Check if path exists
     nothrow auto exists() const {
         return std.file.exists(_path.expandTilde);
@@ -2224,7 +2243,6 @@ private import thepath.exception: PathException;
         // Return null, that means - no path found
         return Nullable!Path.init;
     }
-
 
     /** Example of searching configuration file, when you are somewhere inside
       * project.
