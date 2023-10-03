@@ -19,8 +19,6 @@ implementing it in different way.
 
 ---
 
-**NOTE**: this is beta version, and api may be changed in future
-
 Following ideas used in design of this lib:
 - Implement struct `Path` that have to represent
   single path to file or directory.
