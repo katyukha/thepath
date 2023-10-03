@@ -1,5 +1,13 @@
 # Changelog
 
+## Release v1.0.0
+
+- Add tempFile static method that allows to open temporary files.
+- Remove deprecated `execute` method.
+  Use [TheProcess](https://code.dlang.org/packages/theprocess) instead
+
+---
+
 ## Release v0.1.7
 
 - Added new param to `Path.parent` method - `absolute`, that is by default set to `true` (to keep backward compatibility).
