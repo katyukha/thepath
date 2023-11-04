@@ -1,5 +1,11 @@
 # Changelog
 
+## Release v1.1.0
+
+- Added new method `chown`
+
+---
+
 ## Release v1.0.0
 
 - Add tempFile static method that allows to open temporary files.

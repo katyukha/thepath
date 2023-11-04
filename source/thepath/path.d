@@ -15,6 +15,12 @@ private import thepath.utils: createTempPath, createTempDirectory;
 private import thepath.exception: PathException;
 
 
+version(Posix) {
+    private import core.sys.posix.unistd;
+    private import core.sys.posix.pwd;
+}
+
+
 /** Path - struct that represents single path object, and provides convenient
   * interface to deal with filesystem paths.
   **/
@@ -137,7 +143,7 @@ private import thepath.exception: PathException;
       * Note, that this method compares paths converted to absolute paths.
       *
       * Params:
-      *     other = Path to cher if current path is inside
+      *     other = Path to check if current path is inside it.
       **/
     auto isInside(in Path other) const {
         // TODO: May be there is better way to check if path
@@ -1196,6 +1202,38 @@ private import thepath.exception: PathException;
             Path.current.should.equal(
                 root.join("my-dir", "some-dir", "some-sub-dir"));
         }
+    }
+
+    /** Change owner and group of path
+      **/
+    version(Posix) @trusted void chown(in uid_t uid, in gid_t gid, in bool followSymlink=true) const {
+        import std.string: toStringz;
+        if (isDir)
+            foreach(path; walkBreadth(followSymlink))
+                path.chown(uid, gid, followSymlink);
+        else
+            core.sys.posix.unistd.chown(_path.toStringz, uid, gid);
+    }
+
+    /// ditto
+    version(Posix) @trusted void chown(in string username, in bool followSymlink=true) const {
+        import std.string: toStringz;
+        import std.exception: errnoEnforce;
+
+        /* pw info has following fields:
+         *     - pw_name,
+         *     - pw_passwd,
+         *     - pw_uid,
+         *     - pw_gid,
+         *     - pw_gecos,
+         *     - pw_dir,
+         *     - pw_shell,
+         */
+        auto pw = getpwnam(username.toStringz);
+        errnoEnforce(
+            pw !is null,
+            "Cannot get info about user %s".format(username));
+        this.chown(pw.pw_uid, pw.pw_gid);
     }
 
     /** Copy single file to destination.
