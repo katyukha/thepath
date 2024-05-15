@@ -1,5 +1,13 @@
 # Changelog
 
+## Release v1.2.0
+
+- Added new methods to `Path` struct:
+    - `driveName` that returns Windows drive name
+    - `stripDrive` that returns path without drive part
+
+---
+
 ## Release v1.1.0
 
 - Added new method `chown`

@@ -702,6 +702,46 @@ version(Posix) {
         Path("foo", "moo", "test.txt").baseName.should.equal("test.txt");
     }
 
+    /// Get the drive portion of the path
+    nothrow string driveName() const {
+        return std.path.driveName(_path);
+    }
+
+    ///
+    unittest {
+        import dshould;
+        import std.string: empty;
+        version(Posix) Path("c:/foo").driveName.empty.should.be(true);
+        version(Windows) {
+            Path(`dir\file`).driveName.empty.should.be(true);
+            Path(`d:file`).driveName.should.equal("d:");
+            Path(`d:\file`).driveName.should.equal("d:");
+            Path("d:").driveName.should.equal("d:");
+            Path(`\\server\share\file`).driveName.should.equal(`\\server\share`);
+            Path(`\\server\share\`).driveName.should.equal(`\\server\share`);
+            Path(`\\server\share`).driveName.should.equal(`\\server\share`);
+
+            static assert(Path(`d:\file`).driveName == "d:");
+        }
+    }
+
+    /// Strip drive from Windows path. On Posix the path is returned without changes.
+    nothrow Path stripDrive() const {
+        return Path(std.path.stripDrive(_path));
+    }
+
+    ///
+    unittest {
+        import dshould;
+        version(Posix) {
+            Path("/some/directory").stripDrive.should.equal(Path("/some/directory"));
+        }
+        version(Windows) {
+            Path(`d:\dir\file`).stripDrive.should.equal(Path(`\dir\file`));
+            Path(`\\server\share\dir\file`).stripDrive.should.equal(Path(`\dir\file`));
+        }
+    }
+
     /// Return size of file specified by path
     ulong getSize() const {
         return std.file.getSize(_path.expandTilde);
