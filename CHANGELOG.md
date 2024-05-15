@@ -5,6 +5,8 @@
 - Added new methods to `Path` struct:
     - `driveName` that returns Windows drive name
     - `stripDrive` that returns path without drive part
+    - `stripExt` that returns path without extension
+- Updated doc on `withExt` method, to clarify differents wtih `std.path.withExtension`.
 
 ---
 
