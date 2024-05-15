@@ -672,7 +672,15 @@ version(Posix) {
         Path("foo.moo.zoo").extension.should.equal(".zoo");
     }
 
-    /// Returns path concatenated with provided extension
+    /** Returns path concatenated with provided extension.
+      *
+      * Note: This method works differently that `withExtension` function from
+      * standard library. This method just adds extension,
+      * and if path already contains extension (symbols after dot),
+      * then new extension will be added. This alows to add extensions to
+      * files that contains dot in their names.
+      *
+      **/
     pure nothrow Path withExt(in string ext) const {
         if (ext.length > 1 && ext[0] == '.')
             return Path(_path ~ ext);
@@ -687,6 +695,29 @@ version(Posix) {
 
         Path("foo").withExt(".txt").toString.should.equal("foo.txt");
         Path("foo").withExt("txt").toString.should.equal("foo.txt");
+        Path("foo.test").withExt("txt").toString.should.equal("foo.test.txt");
+    }
+
+    /// Return new path without extension
+    pure nothrow Path stripExt() const {
+        return Path(std.path.stripExtension(_path));
+    }
+
+    /// ditto
+    alias stripExtension = stripExt;
+
+    /// Example of stripExt
+    unittest {
+        import dshould;
+
+        Path("file").stripExt.should.equal(Path("file"));
+        Path("file.ext").stripExtension.should.equal(Path("file"));
+        Path("file.ext1.ext2").stripExtension.should.equal(Path("file.ext1"));
+        Path("file.").stripExtension.should.equal(Path("file"));
+        Path(".file").stripExtension.should.equal(Path(".file"));
+        Path(".file.ext").stripExtension.should.equal(Path(".file"));
+        Path("dir/file.ext").stripExtension.should.equal(Path("dir/file"));
+        Path("dir.test/file").stripExtension.should.equal(Path("dir.test/file"));
     }
 
     /// Returns base name of current path
