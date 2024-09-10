@@ -2362,7 +2362,7 @@ version(Posix) {
         import core.sys.posix.sys.stat;
 
         // Check that directory has numeric permissions 775
-        root.join("test-dir").hasAttributes(octal!775).should.be(true);
+        root.join("test-dir").hasAttributes(octal!755).should.be(true);
 
         // Check that file has numeric permissions 644
         root.join("test-dir", "test.txt").hasAttributes(octal!644).should.be(true);
