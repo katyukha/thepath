@@ -1,5 +1,12 @@
 # Changelog
 
+## Release v2.0.0
+
+- **Breaking!** Changed signature for `chown` method. now it receives one more
+  argument `recursive` that is placed before `followSymlink`. Thus is may be incompatible with 1.x.x version
+
+---
+
 ## Release v1.2.0
 
 - Added new methods to `Path` struct:

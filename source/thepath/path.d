@@ -18,6 +18,7 @@ private import thepath.exception: PathException;
 version(Posix) {
     private import core.sys.posix.unistd;
     private import core.sys.posix.pwd;
+    private import core.sys.posix.grp;
 }
 
 
@@ -1277,17 +1278,20 @@ version(Posix) {
 
     /** Change owner and group of path
       **/
-    version(Posix) @trusted void chown(in uid_t uid, in gid_t gid, in bool followSymlink=true) const {
+    version(Posix) @trusted void chown(in uid_t uid, in gid_t gid, in bool recursive=false, in bool followSymlink=true) const {
         import std.string: toStringz;
-        if (isDir)
+
+        // Change owner of current file or directory
+        core.sys.posix.unistd.chown(_path.toStringz, uid, gid);
+
+        // If recursive is specified and path is directory, then change owner recursively
+        if (recursive && isDir)
             foreach(path; walkBreadth(followSymlink))
-                path.chown(uid, gid, followSymlink);
-        else
-            core.sys.posix.unistd.chown(_path.toStringz, uid, gid);
+                path.chown(uid, gid, recursive, followSymlink);
     }
 
     /// ditto
-    version(Posix) @trusted void chown(in string username, in bool followSymlink=true) const {
+    version(Posix) @trusted void chown(in string username, in string groupname, in bool recursive=false, in bool followSymlink=true) const {
         import std.string: toStringz;
         import std.exception: errnoEnforce;
 
@@ -1304,7 +1308,32 @@ version(Posix) {
         errnoEnforce(
             pw !is null,
             "Cannot get info about user %s".format(username));
-        this.chown(pw.pw_uid, pw.pw_gid);
+        auto gr = getgrnam(groupname.toStringz);
+        errnoEnforce(
+            gr !is null,
+            "Cannot get info about user %s".format(username));
+        this.chown(pw.pw_uid, gr.gr_gid, recursive, followSymlink);
+    }
+
+    /// ditto
+    version(Posix) @trusted void chown(in string username, in bool recursive=false, in bool followSymlink=true) const {
+        import std.string: toStringz;
+        import std.exception: errnoEnforce;
+
+        /* pw info has following fields:
+         *     - pw_name,
+         *     - pw_passwd,
+         *     - pw_uid,
+         *     - pw_gid,
+         *     - pw_gecos,
+         *     - pw_dir,
+         *     - pw_shell,
+         */
+        auto pw = getpwnam(username.toStringz);
+        errnoEnforce(
+            pw !is null,
+            "Cannot get info about user %s".format(username));
+        this.chown(pw.pw_uid, pw.pw_gid, recursive, followSymlink);
     }
 
     /** Copy single file to destination.
@@ -2316,6 +2345,47 @@ version(Posix) {
         root.join("test-file.txt").hasAttributes(S_IWOTH).should.be(false);
         root.join("test-file.txt").hasAttributes(S_IROTH).should.be(false);
         root.join("test-file.txt").hasAttributes(S_IXOTH).should.be(false);
+    }
+
+    /// Example of changing attributes of directory.
+    version(Posix) unittest {
+        import dshould;
+        import std.conv: octal;
+        Path root = createTempPath();
+        scope(exit) root.remove();
+
+        // Create directory and file inside
+        root.join("test-dir").mkdir();
+        root.join("test-dir", "test.txt").writeFile("Hello world");
+
+        // Here we have to import bitmasks from system;
+        import core.sys.posix.sys.stat;
+
+        // Check that directory has numeric permissions 775
+        root.join("test-dir").hasAttributes(octal!775).should.be(true);
+
+        // Check that file has numeric permissions 644
+        root.join("test-dir", "test.txt").hasAttributes(octal!644).should.be(true);
+
+        // Add right to write directory by others
+        root.join("test-dir").setAttributes(octal!777);
+
+        // Test that directory is now writable by others
+        root.join("test-dir").hasAttributes(octal!777).should.be(true);
+
+        // But file is not writable by others
+        root.join("test-dir", "test.txt").hasAttributes(octal!646).should.be(false);
+
+        // make directory not readable nor writable by others
+        root.join("test-dir").setAttributes(octal!770);
+
+        // Test that directory changed permissions
+        root.join("test-dir").hasAttributes(octal!770).should.be(true);
+        root.join("test-dir").hasAttributes(octal!777).should.be(false);
+
+        // Test that no group users can write the file
+        root.join("test-dir", "test.txt").hasAttributes(octal!644).should.be(true);
+        root.join("test-dir", "test.txt").hasAttributes(octal!646).should.be(false);
     }
 
     /** Search file by name in current directory and parent directories.
