@@ -336,6 +336,18 @@ version(Posix) {
         }
     }
 
+    /// Home path (~)
+    version(Posix) static home() {
+        return Path("~").toAbsolute;
+    }
+
+    version(Posix) unittest {
+        import dshould;
+        import std.process: environment;
+
+        Path.home.toString.should.equal(environment.get("HOME"));
+    }
+
     /// Get system's temp directory
     static Path tempDir() {
         return Path(std.file.tempDir);
@@ -827,7 +839,8 @@ version(Posix) {
         import std.string: toStringz, fromStringz;
         import std.exception: errnoEnforce;
 
-        const char* conv_path = _path.toStringz;
+        string path = _path.expandTilde;  // keep var to avoid gc
+        const char* conv_path = path.toStringz;
         char* result = realpath(conv_path, null);
         scope (exit) {
             if (result)
@@ -873,6 +886,13 @@ version(Posix) {
 
         // realpath on unexisting path must throw error
         root.join("test-dir", "bad-path").realPath.should.throwA!ErrnoException;
+    }
+
+    ///
+    version(Posix) unittest {
+        import dshould;
+
+        Path("~").expandTilde.toAbsolute.should.equal(Path("~").realPath);
     }
 
     /** Check if path matches specified glob pattern.

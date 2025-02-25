@@ -3,6 +3,6 @@
 	"versions": {
 		"dshould": "1.7.2",
 		"prettyprint": "1.0.9",
-		"unit-threaded": "2.2.0"
+		"unit-threaded": "2.2.1"
 	}
 }

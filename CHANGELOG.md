@@ -1,5 +1,10 @@
 # Changelog
 
+## Release v2.1.0
+
+- Added `Path.home` static func, that allows to get user's home directory on posix systems.
+- Auto `expandTilde` on `realPath` to avoid errors on attept to `Path("~").realPath`.
+
 ## Release v2.0.0
 
 - **Breaking!** Changed signature for `chown` method. now it receives one more
