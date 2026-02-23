@@ -22,6 +22,22 @@ version(Posix) {
 }
 
 
+/** Specifies cross-device move behavior for $(LREF Path.rename).
+  *
+  * When source and destination reside on different filesystems,
+  * the OS cannot perform an atomic rename. This enum controls what
+  * $(LREF Path.rename) does in that situation.
+  **/
+enum CrossDeviceMove {
+    /// Throw $(LREF PathException) when a cross-device move is attempted.
+    deny,
+    /// Fall back to a copy-then-delete when a cross-device move is detected.
+    /// The copy is guarded by a $(D scope(failure)) cleanup, but the operation
+    /// is not atomic: a crash between copy and delete leaves both copies present.
+    copyAndDelete,
+}
+
+
 /** Path - struct that represents single path object, and provides convenient
   * interface to deal with filesystem paths.
   **/
@@ -1819,24 +1835,60 @@ version(Posix) {
         root.join("test-symlink.txt").exists.should.be(false);
     }
 
-    /** Rename current path.
+    /** Rename (move) current path to $(D to).
       *
-      * Note: case of moving file/dir between filesystesm is not tested.
+      * On the same filesystem the underlying OS rename is atomic.
+      * When source and destination are on different filesystems the behavior
+      * is controlled by the $(D crossDeviceMove) template parameter:
       *
+      * - $(D CrossDeviceMove.deny) (default): throws $(LREF PathException).
+      * - $(D CrossDeviceMove.copyAndDelete): falls back to copy + delete.
+      *   The copy is protected by a $(D scope(failure)) that removes a
+      *   partial destination, but the two-step operation is not atomic.
+      *
+      * Template Params:
+      *     crossDeviceMove = cross-device behavior; default is
+      *         $(D CrossDeviceMove.deny).
+      * Params:
+      *     to = destination path.
       * Throws:
-      *     PathException when destination already exists
+      *     PathException when destination already exists or when a
+      *     cross-device move is attempted with $(D CrossDeviceMove.deny).
       **/
-    void rename(in Path to) const {
-        // TODO: Add support to move files between filesystems
+    void rename(CrossDeviceMove crossDeviceMove = CrossDeviceMove.deny)(in Path to) const {
         enforce!PathException(
             !to.exists,
             "Destination %s already exists!".format(to));
-        std.file.rename(_path.expandTilde, to._path.expandTilde);
+        try {
+            std.file.rename(_path.expandTilde, to._path.expandTilde);
+        } catch (std.file.FileException e) {
+            static if (crossDeviceMove == CrossDeviceMove.copyAndDelete) {
+                bool isCrossDevice = false;
+                version(Posix) {
+                    import core.stdc.errno: EXDEV;
+                    isCrossDevice = (e.errno == EXDEV);
+                }
+                version(Windows) {
+                    import core.sys.windows.winerror: ERROR_NOT_SAME_DEVICE;
+                    isCrossDevice = (e.errno == ERROR_NOT_SAME_DEVICE);
+                }
+                if (isCrossDevice) {
+                    (() @trusted {
+                        scope(failure) if (to.exists) to.remove();
+                        this.copyTo(to);
+                        this.remove();
+                    })();
+                    return;
+                }
+            }
+            throw new PathException(
+                "Cannot rename %s to %s: %s".format(this, to, e.msg));
+        }
     }
 
     /// ditto
-    void rename(in string to) const {
-        return rename(Path(to));
+    void rename(CrossDeviceMove crossDeviceMove = CrossDeviceMove.deny)(in string to) const {
+        rename!crossDeviceMove(Path(to));
     }
 
     ///
@@ -1906,7 +1958,9 @@ version(Posix) {
 
 
         version(Posix) {
-            // Prepare test dir in user's home directory
+            // Prepare test dir in user's home directory.
+            // This move may cross filesystem boundaries (e.g. /tmp vs ~/),
+            // so use CrossDeviceMove.copyAndDelete to handle both cases.
             Path home_tmp = createTempPath("~", "tmp-d-test");
             scope(exit) home_tmp.remove();
 
@@ -1916,7 +1970,7 @@ version(Posix) {
             home_tmp.join("test-dir", "d2").exists.should.be(false);
             home_tmp.join("test-dir", "d2", "f2.txt").exists.should.be(false);
 
-            root.join("test-dir-new").rename(
+            root.join("test-dir-new").rename!(CrossDeviceMove.copyAndDelete)(
                     Path("~").join(home_tmp.baseName, "test-dir"));
 
             // Ensure test dir was renamed successfully
