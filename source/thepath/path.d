@@ -101,6 +101,24 @@ version(Posix) {
         return std.path.isRooted(_path);
     }
 
+    ///
+    unittest {
+        import dshould;
+
+        Path("").isRooted.should.be(false);
+        Path("foo").isRooted.should.be(false);
+        Path("foo", "bar").isRooted.should.be(false);
+        version(Posix) {
+            Path("/").isRooted.should.be(true);
+            Path("/foo").isRooted.should.be(true);
+            Path("/foo/bar").isRooted.should.be(true);
+        }
+        version(Windows) {
+            Path(`C:\foo`).isRooted.should.be(true);
+            Path(`\foo`).isRooted.should.be(true);
+        }
+    }
+
     /// Check if current path is root (does not have parent)
     pure auto isRoot() const {
         import std.path: isDirSeparator;
@@ -194,6 +212,32 @@ version(Posix) {
     /// Determine if path is symlink
     auto isSymlink() const {
         return std.file.isSymlink(_path.expandTilde);
+    }
+
+    ///
+    unittest {
+        import dshould;
+        Path root = createTempPath();
+        scope(exit) root.remove();
+
+        root.join("file.txt").writeFile("hello");
+        root.join("sub-dir").mkdir();
+
+        root.join("file.txt").isFile.should.be(true);
+        root.join("sub-dir").isFile.should.be(false);
+
+        root.join("file.txt").isDir.should.be(false);
+        root.join("sub-dir").isDir.should.be(true);
+
+        root.join("file.txt").isSymlink.should.be(false);
+        root.join("sub-dir").isSymlink.should.be(false);
+
+        version(Posix) {
+            root.join("file.txt").symlink(root.join("link.txt"));
+            root.join("link.txt").isSymlink.should.be(true);
+            root.join("link.txt").isFile.should.be(true);
+            root.join("link.txt").isDir.should.be(false);
+        }
     }
 
     /** Override comparison operators to use OS-specific case-sensitivity
@@ -486,6 +530,18 @@ version(Posix) {
       **/
     nothrow Path expandTilde() const {
         return Path(std.path.expandTilde(_path));
+    }
+
+    version(Posix) unittest {
+        import dshould;
+        import std.process: environment;
+
+        string homeDir = environment.get("HOME");
+
+        Path("~/foo").expandTilde.should.equal(Path(homeDir ~ "/foo"));
+        Path("~/foo/bar").expandTilde.should.equal(Path(homeDir ~ "/foo/bar"));
+        Path("/absolute/path").expandTilde.should.equal(Path("/absolute/path"));
+        Path("relative/path").expandTilde.should.equal(Path("relative/path"));
     }
 
     /** Normalize path.
@@ -907,6 +963,23 @@ version(Posix) {
       **/
     pure nothrow bool matchGlob(in string pattern) {
         return std.path.globMatch(_path, pattern);
+    }
+
+    ///
+    unittest {
+        import dshould;
+
+        Path("foo.txt").matchGlob("*.txt").should.be(true);
+        Path("foo.txt").matchGlob("*.py").should.be(false);
+        Path("foo.txt").matchGlob("fo?.txt").should.be(true);
+        Path("foo.txt").matchGlob("bar.txt").should.be(false);
+
+        // Note: * spans path separators in std.path.globMatch
+        Path("dir/file.txt").matchGlob("dir/*.txt").should.be(true);
+        Path("dir/file.txt").matchGlob("*.txt").should.be(true);
+        Path("dir/file.txt").matchGlob("*/*.txt").should.be(true);
+        Path("dir/file.txt").matchGlob("*/*").should.be(true);
+        Path("dir/file.txt").matchGlob("*.py").should.be(false);
     }
 
     /** Iterate over all files and directories inside path;
@@ -1362,6 +1435,48 @@ version(Posix) {
             pw !is null,
             "Cannot get info about user %s".format(username));
         this.chown(pw.pw_uid, pw.pw_gid, recursive, followSymlink);
+    }
+
+    version(Posix) @trusted unittest {
+        import dshould;
+        import core.sys.posix.unistd: getuid, getgid;
+        import core.sys.posix.pwd: getpwuid;
+        import core.sys.posix.grp: getgrgid;
+        import std.string: fromStringz;
+        import std.exception: ErrnoException;
+
+        Path root = createTempPath();
+        scope(exit) root.remove();
+
+        root.join("test-file.txt").writeFile("hello");
+        root.join("sub-dir").mkdir();
+        root.join("sub-dir", "f.txt").writeFile("world");
+
+        uid_t uid = getuid();
+        gid_t gid = getgid();
+
+        // chown by uid/gid to current user (no-op, but exercises the path)
+        root.join("test-file.txt").chown(uid, gid);
+
+        // recursive chown
+        root.join("sub-dir").chown(uid, gid, true);
+
+        // Determine current username and group name for string-based overloads
+        auto pw = getpwuid(uid);
+        auto gr = getgrgid(gid);
+        if (pw !is null && gr !is null) {
+            string username = pw.pw_name.fromStringz.idup;
+            string groupname = gr.gr_name.fromStringz.idup;
+
+            root.join("test-file.txt").chown(username, groupname);
+            root.join("sub-dir").chown(username, groupname, true);
+            root.join("test-file.txt").chown(username);
+            root.join("sub-dir").chown(username, true);
+        }
+
+        // Non-existent user should throw
+        root.join("test-file.txt").chown("no-such-user-xyz", "no-such-group-xyz").should.throwA!ErrnoException;
+        root.join("test-file.txt").chown("no-such-user-xyz").should.throwA!ErrnoException;
     }
 
     /** Copy single file to destination.
