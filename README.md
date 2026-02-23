@@ -55,24 +55,23 @@ Following ideas used in design of this lib:
 - simple deconstruction of paths
     - `Path("a/b/c/d").segments == ["a", "b", "c", "d"]`
     - `Path("a", "b", "c", "d").segments == ["a", "b", "c", "d"]`
-- overriden comparison operators for paths.
+- overridden comparison operators for paths
     - `Path("a", "b") == Path("a", "b")`
     - `Path("a", "b") != Path("a", "c")`
     - `Path("a", "b") < Path("a", "c")`
-- `hasAttributes` / `getAttributes` / `setAttributes` methods to work with file attrs
+- `hasAttributes` / `getAttributes` / `setAttributes` methods to work with file attributes
 - file operations as methods:
     - `Path("my-path").writeFile("Hello world")`
     - `Path("my-path").readFile()`
 - support search by glob-pattern
-    - `foreach(path; Path.current.glob("*.py")) writeln(p.toString);`
-- easy access to some standard directories via Path's static methods:
-    - `Path.current` - returns path to current working directory
-    - `Path.tempDir` - returns path to default temporary directory
-
-
-## To Do
-
-- Any other features needed?
+    - `foreach(path; Path.current.glob("*.py")) writeln(path.toString);`
+- two methods for moving paths:
+    - `path.rename(dest)` — atomic same-filesystem rename; throws if source and destination are on different filesystems
+    - `path.move(dest)` — works across filesystems; attempts rename first, falls back to copy + delete when needed
+- easy access to some standard directories via `Path`'s static methods:
+    - `Path.current` — current working directory
+    - `Path.tempDir` — default temporary directory
+    - `Path.home` — user's home directory (Posix)
 
 
 ## Examples
@@ -107,7 +106,7 @@ void list_dir() {
 void find_python_files() {
     foreach(path; Path.current.glob("*.py", SpanMode.breadth))
         // Print paths relative to current directory
-        writeln(p.relativeTo(Path.current).toString);
+        writeln(path.relativeTo(Path.current).toString);
 }
 
 Path findConfig() {

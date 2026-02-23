@@ -1,5 +1,29 @@
 # Changelog
 
+## Release v2.2.0
+
+### New features
+
+- Added `Path.move` method that moves a path to a new destination. Attempts an
+  atomic OS rename first; if source and destination are on different filesystems
+  (`EXDEV` on Posix, `ERROR_NOT_SAME_DEVICE` on Windows) it falls back to a
+  copy-then-delete. The copy is guarded by a `scope(failure)` that removes a
+  partial destination on error.
+
+### Bug fixes
+
+- Fixed missing tilde (`~`) expansion in `copyFileTo` (both source and
+  destination paths), `setAttributes`, `symlink`, and the `chown` Posix syscall.
+- Fixed `chown` with `recursive=true` re-walking already-visited subdirectories,
+  causing O(n²) syscall count on deep trees.
+- Fixed wrong error message in `chown(username, groupname, ...)`: the group
+  lookup failure now reports the group name instead of the user name.
+- Fixed `copyTo`: format placeholder `%s` in the `enforce` message now receives
+  the source path as its argument.
+- Removed spurious `return` on the void `std.file.rename` call inside `rename`.
+
+---
+
 ## Release v2.1.0
 
 - Added `Path.home` static func, that allows to get user's home directory on posix systems.
