@@ -609,6 +609,8 @@ version(Posix) {
 
             Path("~/test-dir").parent.toString.should.equal(
                 "~".expandTilde);
+
+            Path("test").parent(false).toString.should.equal(".");
         }
     }
 
@@ -800,6 +802,9 @@ version(Posix) {
         ubyte[4] data = [1, 2, 3, 4];
         root.join("test-file.txt").writeFile(data);
         root.join("test-file.txt").getSize.should.equal(4);
+
+        root.join("empty.txt").writeFile([]);
+        root.join("empty.txt").getSize.should.equal(0);
 
         version(Posix) {
             // Prepare test dir in user's home directory
@@ -1302,12 +1307,12 @@ version(Posix) {
         import std.string: toStringz;
 
         // Change owner of current file or directory
-        core.sys.posix.unistd.chown(_path.toStringz, uid, gid);
+        core.sys.posix.unistd.chown(_path.expandTilde.toStringz, uid, gid);
 
         // If recursive is specified and path is directory, then change owner recursively
         if (recursive && isDir)
             foreach(path; walkBreadth(followSymlink))
-                path.chown(uid, gid, recursive, followSymlink);
+                path.chown(uid, gid, false, followSymlink);
     }
 
     /// ditto
@@ -1331,7 +1336,7 @@ version(Posix) {
         auto gr = getgrnam(groupname.toStringz);
         errnoEnforce(
             gr !is null,
-            "Cannot get info about user %s".format(username));
+            "Cannot get info about group %s".format(groupname));
         this.chown(pw.pw_uid, gr.gr_gid, recursive, followSymlink);
     }
 
@@ -1384,10 +1389,10 @@ version(Posix) {
                 throw new PathException(
                         "Cannot copy! Destination file %s already exists!".format(dest._path));
             } else {
-                std.file.copy(_path, dest._path);
+                std.file.copy(_path.expandTilde, dest._path.expandTilde);
             }
         } else {
-            std.file.copy(_path, dest._path);
+            std.file.copy(_path.expandTilde, dest._path.expandTilde);
         }
     }
 
@@ -1451,7 +1456,6 @@ version(Posix) {
       *     PathException when cannot copy
       **/
     @system void copyTo(in Path dest) const {
-        import std.stdio;
         if (isDir) {
             Path dst_root = dest.toAbsolute;
             if (dst_root.exists) {
@@ -1468,7 +1472,7 @@ version(Posix) {
             foreach (Path src; src_root.walk(SpanMode.breadth)) {
                 enforce!PathException(
                     src.isFile || src.isDir,
-                    "Cannot copy %s: it is not file nor directory.");
+                    "Cannot copy %s: it is not file nor directory.".format(src));
                 auto dst = dst_root.join(src.relativeTo(src_root));
                 if (src.isFile)
                     std.file.copy(src._path, dst._path);
@@ -1827,7 +1831,7 @@ version(Posix) {
         enforce!PathException(
             !to.exists,
             "Destination %s already exists!".format(to));
-        return std.file.rename(_path.expandTilde, to._path.expandTilde);
+        std.file.rename(_path.expandTilde, to._path.expandTilde);
     }
 
     /// ditto
@@ -1991,7 +1995,7 @@ version(Posix) {
       *     FileException
       **/
     version(Posix) void symlink(in Path dest) const {
-        std.file.symlink(_path, dest._path);
+        std.file.symlink(_path.expandTilde, dest._path.expandTilde);
     }
 
     ///
@@ -2316,7 +2320,7 @@ version(Posix) {
       *      attributes = value representing attributes to set on path.
       **/
     void setAttributes(in uint attributes) const {
-        std.file.setAttributes(_path, attributes);
+        std.file.setAttributes(_path.expandTilde, attributes);
     }
 
     /// Example of changing attributes of file.
