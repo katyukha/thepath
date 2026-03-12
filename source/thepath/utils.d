@@ -153,7 +153,7 @@ version(Windows) @system unittest {
   *     dg = delegate to execute with the temporary directory path
   * Returns: The value returned by the delegate (if non-void)
   **/
-@safe auto withTempDir(Dg, Args...)(Args args, Dg dg)
+auto withTempDir(Dg, Args...)(Args args, Dg dg)
 if (is(typeof(createTempPath(args))) && is(typeof(dg(Path.init)))) {
     auto tmp = createTempPath(args);
     scope(exit) tmp.remove();
@@ -165,7 +165,7 @@ if (is(typeof(createTempPath(args))) && is(typeof(dg(Path.init)))) {
 }
 
 /// ditto — no-args overload (uses default prefix)
-@safe auto withTempDir(Dg)(Dg dg)
+auto withTempDir(Dg)(Dg dg)
 if (is(typeof(dg(Path.init)))) {
     auto tmp = createTempPath();
     scope(exit) tmp.remove();
