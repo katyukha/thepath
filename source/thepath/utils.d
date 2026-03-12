@@ -137,3 +137,110 @@ version(Windows) @system unittest {
 @safe Path createTempPath(in Path path, in string prefix) {
     return createTempPath(path.toString, prefix);
 }
+
+
+/** Create a temporary directory, pass it to the delegate, and remove it
+  * after the delegate completes (whether it returns normally or throws).
+  *
+  * This is the recommended way to work with temporary directories, as it
+  * guarantees cleanup without requiring manual `scope(exit)` at every call site.
+  *
+  * All arguments except the delegate are forwarded to `createTempPath`,
+  * so any overload of `createTempPath` is supported automatically.
+  *
+  * Params:
+  *     args = arguments forwarded to `createTempPath` (prefix, path, etc.)
+  *     dg = delegate to execute with the temporary directory path
+  * Returns: The value returned by the delegate (if non-void)
+  **/
+@safe auto withTempDir(Dg, Args...)(Args args, Dg dg)
+if (is(typeof(createTempPath(args))) && is(typeof(dg(Path.init)))) {
+    auto tmp = createTempPath(args);
+    scope(exit) tmp.remove();
+    static if (is(typeof(dg(tmp)) == void)) {
+        dg(tmp);
+    } else {
+        return dg(tmp);
+    }
+}
+
+/// ditto — no-args overload (uses default prefix)
+@safe auto withTempDir(Dg)(Dg dg)
+if (is(typeof(dg(Path.init)))) {
+    auto tmp = createTempPath();
+    scope(exit) tmp.remove();
+    static if (is(typeof(dg(tmp)) == void)) {
+        dg(tmp);
+    } else {
+        return dg(tmp);
+    }
+}
+
+/// withTempDir with void delegate (no args)
+@system unittest {
+    import dshould;
+
+    Path saved;
+    withTempDir((Path tmp) {
+        tmp.exists.should.be(true);
+        tmp.isDir.should.be(true);
+        saved = tmp;
+    });
+    saved.exists.should.be(false);
+}
+
+/// withTempDir with void delegate and prefix
+@system unittest {
+    import dshould;
+
+    Path saved;
+    withTempDir("test-with-tmp", (Path tmp) {
+        tmp.exists.should.be(true);
+        tmp.isDir.should.be(true);
+        tmp.baseName[0..14].should.equal("test-with-tmp-");
+        saved = tmp;
+    });
+    // temp dir should be removed after delegate returns
+    saved.exists.should.be(false);
+}
+
+/// withTempDir with return value
+@system unittest {
+    import dshould;
+
+    auto result = withTempDir("test-ret", (Path tmp) {
+        tmp.exists.should.be(true);
+        tmp.join("hello.txt").writeFile("world");
+        return tmp.join("hello.txt").readFileText();
+    });
+    result.should.equal("world");
+}
+
+/// withTempDir with custom base path
+@system unittest {
+    import dshould;
+    import std.file : tempDir;
+
+    Path saved;
+    withTempDir(tempDir, "test-custom-base", (Path tmp) {
+        tmp.exists.should.be(true);
+        saved = tmp;
+    });
+    saved.exists.should.be(false);
+}
+
+/// withTempDir cleans up even on exception
+@system unittest {
+    import dshould;
+    import std.exception : assertThrown;
+
+    Path saved;
+    assertThrown!Exception(
+        withTempDir("test-exc", (Path tmp) {
+            saved = tmp;
+            tmp.exists.should.be(true);
+            throw new Exception("test error");
+        })
+    );
+    saved.exists.should.be(false);
+}

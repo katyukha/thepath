@@ -72,6 +72,8 @@ Following ideas used in design of this lib:
     - `Path.current` — current working directory
     - `Path.tempDir` — default temporary directory
     - `Path.home` — user's home directory (Posix)
+- Utility function `thepath.utils.withTempDir` — creates a temporary directory, passes it to a delegate, and
+  cleans it up automatically on return or exception
 
 
 ## Examples

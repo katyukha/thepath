@@ -10,7 +10,7 @@
 module thepath;
 
 public import thepath.path: Path;
-public import thepath.utils: createTempDirectory, createTempPath;
+public import thepath.utils: createTempDirectory, createTempPath, withTempDir;
 public import thepath.exception: PathException;
 
 /// Example to find configuration of current project
