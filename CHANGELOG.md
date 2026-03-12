@@ -1,5 +1,15 @@
 # Changelog
 
+## Release v2.3.0
+
+### New features
+
+- Added `withTempDir` — a helper that creates a temporary directory, passes it
+  to a delegate, and automatically removes it when the delegate returns (or
+  throws).
+
+---
+
 ## Release v2.2.0
 
 ### New features
