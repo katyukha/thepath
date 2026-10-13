@@ -60,7 +60,7 @@ Following ideas used in design of this lib:
     - `Path("a", "b") != Path("a", "c")`
     - `Path("a", "b") < Path("a", "c")`
 - `hasAttributes` / `getAttributes` / `setAttributes` methods to work with file attributes
-- symlinks support (`symlink`, `readLink`, `realPath`, `exists(followSymlink)`) — Posix only;
+- symlinks support (`symlink`, `readLink`, `realPath`, `followSymlink` argument of `exists`, `isFile`, `isDir`) — Posix only;
   symlinks are not supported on Windows
 - file operations as methods:
     - `Path("my-path").writeFile("Hello world")`

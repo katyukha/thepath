@@ -199,14 +199,34 @@ version(Posix) {
         Path(null).segments.empty.should.be(true);
     }
 
-    /// Determine if path is file.
-    auto isFile() const {
-        return std.file.isFile(_path.expandTilde);
+    /** Determine if path is file.
+      *
+      * Params:
+      *     followSymlink = if set, a symlink to a file is reported as file.
+      *         Otherwise a symlink is never reported as file, and a broken
+      *         symlink does not raise an error.
+      *         Symlinks are supported on Posix only: on Windows this
+      *         parameter is ignored.
+      **/
+    auto isFile(in bool followSymlink=true) const {
+        if (followSymlink)
+            return std.file.isFile(_path.expandTilde);
+        return std.file.attrIsFile(std.file.getLinkAttributes(_path.expandTilde));
     }
 
-    /// Determine if path is directory.
-    auto isDir() const {
-        return std.file.isDir(_path.expandTilde);
+    /** Determine if path is directory.
+      *
+      * Params:
+      *     followSymlink = if set, a symlink to a directory is reported as
+      *         directory. Otherwise a symlink is never reported as directory,
+      *         and a broken symlink does not raise an error.
+      *         Symlinks are supported on Posix only: on Windows this
+      *         parameter is ignored.
+      **/
+    auto isDir(in bool followSymlink=true) const {
+        if (followSymlink)
+            return std.file.isDir(_path.expandTilde);
+        return std.file.attrIsDir(std.file.getLinkAttributes(_path.expandTilde));
     }
 
     /// Determine if path is symlink
@@ -232,11 +252,25 @@ version(Posix) {
         root.join("file.txt").isSymlink.should.be(false);
         root.join("sub-dir").isSymlink.should.be(false);
 
+        // Paths that are not symlinks give the same result in both modes
+        root.join("file.txt").isFile(false).should.be(true);
+        root.join("sub-dir").isDir(false).should.be(true);
+
         version(Posix) {
             root.join("file.txt").symlink(root.join("link.txt"));
             root.join("link.txt").isSymlink.should.be(true);
             root.join("link.txt").isFile.should.be(true);
             root.join("link.txt").isDir.should.be(false);
+
+            // Without following, symlink is neither file nor directory
+            root.join("sub-dir").symlink(root.join("dir-link"));
+            root.join("link.txt").isFile(false).should.be(false);
+            root.join("dir-link").isDir(false).should.be(false);
+
+            // ... and a broken symlink does not raise an error
+            root.join("missing").symlink(root.join("broken-link"));
+            root.join("broken-link").isFile(false).should.be(false);
+            root.join("broken-link").isDir(false).should.be(false);
         }
     }
 
@@ -1419,6 +1453,13 @@ version(Posix) {
     }
 
     /** Change owner and group of path
+      *
+      * Params:
+      *     recursive = if path is directory, change owner of its content too.
+      *     followSymlink = if set, change owner of symlink targets, and
+      *         descend into symlinked directories when recursive.
+      *         Otherwise change owner of symlinks themselves, so nothing
+      *         outside of this path is touched.
       **/
     version(Posix) @trusted void chown(in uid_t uid, in gid_t gid, in bool recursive=false, in bool followSymlink=true) const {
         import std.string: toStringz;
@@ -1427,10 +1468,13 @@ version(Posix) {
         // Keep expanded in a named variable so the GC does not collect the
         // backing allocation before the C syscall reads the pointer.
         auto expanded = _path.expandTilde;
-        core.sys.posix.unistd.chown(expanded.toStringz, uid, gid);
+        if (followSymlink)
+            core.sys.posix.unistd.chown(expanded.toStringz, uid, gid);
+        else
+            core.sys.posix.unistd.lchown(expanded.toStringz, uid, gid);
 
         // If recursive is specified and path is directory, then change owner recursively
-        if (recursive && isDir)
+        if (recursive && isDir(followSymlink))
             foreach(path; walkBreadth(followSymlink))
                 path.chown(uid, gid, false, followSymlink);
     }
@@ -1521,6 +1565,63 @@ version(Posix) {
         // Non-existent user should throw
         root.join("test-file.txt").chown("no-such-user-xyz", "no-such-group-xyz").should.throwA!ErrnoException;
         root.join("test-file.txt").chown("no-such-user-xyz").should.throwA!ErrnoException;
+    }
+
+    /// Test recursive chown on tree with symlinks
+    version(Posix) @trusted unittest {
+        import dshould;
+        import core.sys.posix.unistd: getuid, getgroups;
+        import core.sys.posix.sys.stat: lstat, stat_t;
+        import std.algorithm: filter;
+        import std.exception: errnoEnforce;
+        import std.string: toStringz;
+
+        gid_t gidOf(in Path p) {
+            stat_t st;
+            errnoEnforce(lstat(p.toString.toStringz, &st) == 0);
+            return st.st_gid;
+        }
+
+        Path root = createTempPath();
+        scope(exit) root.remove();
+
+        root.join("tree").mkdir();
+        root.join("tree", "file.txt").writeFile("hello");
+        root.join("outside").mkdir();
+        root.join("outside", "secret.txt").writeFile("secret");
+        root.join("outside", "secret.txt").symlink(root.join("tree", "file-link"));
+        root.join("outside").symlink(root.join("tree", "dir-link"));
+        root.join("outside").symlink(root.join("outside-link"));
+
+        // Ownership change is observable only with a group, that differs
+        // from the group of created files: non-root user can change group
+        // only to one of its own groups.
+        immutable gid_t initial = gidOf(root.join("outside", "secret.txt"));
+        auto groups = new gid_t[getgroups(0, null)];
+        groups.length = getgroups(cast(int)groups.length, groups.ptr);
+        auto other = groups.filter!(g => g != initial);
+        if (other.empty)
+            return;
+        immutable gid_t target = other.front;
+
+        // Without following, symlinks are changed, but not their targets
+        root.join("tree").chown(getuid(), target, true, false);
+        gidOf(root.join("tree", "file.txt")).should.equal(target);
+        gidOf(root.join("tree", "file-link")).should.equal(target);
+        gidOf(root.join("tree", "dir-link")).should.equal(target);
+        gidOf(root.join("outside")).should.equal(initial);
+        gidOf(root.join("outside", "secret.txt")).should.equal(initial);
+
+        // Same for path, that is symlink itself
+        root.join("outside-link").chown(getuid(), target, true, false);
+        gidOf(root.join("outside-link")).should.equal(target);
+        gidOf(root.join("outside")).should.equal(initial);
+        gidOf(root.join("outside", "secret.txt")).should.equal(initial);
+
+        // With following, targets are changed too
+        root.join("tree").chown(getuid(), target, true, true);
+        gidOf(root.join("outside")).should.equal(target);
+        gidOf(root.join("outside", "secret.txt")).should.equal(target);
     }
 
     /** Copy single file to destination.
