@@ -1,5 +1,14 @@
 # Changelog
 
+## Release v2.4.0
+
+### New features
+
+- `Path.exists` got new argument `followSymlink`,
+   that will check if destination referenced by symlink exists.
+
+---
+
 ## Release v2.3.0
 
 ### New features

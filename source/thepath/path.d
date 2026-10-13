@@ -422,8 +422,26 @@ version(Posix) {
         f.readln().should.equal("Hello World\n");
     }
 
-    /// Check if path exists
-    nothrow auto exists() const {
+    /** Check if path exists
+      *
+      * By default a symlink is checked itself, not its target,
+      * so a broken symlink is reported as existing.
+      *
+      * Params:
+      *     followSymlink = if set, check the target of a symlink instead,
+      *         so a broken symlink is reported as not existing.
+      *         Symlinks are supported on Posix only: on Windows this
+      *         parameter is ignored.
+      **/
+    nothrow auto exists(in bool followSymlink=false) const {
+        version(Posix) if (followSymlink) {
+            import core.sys.posix.sys.stat: stat, stat_t;
+            import std.string: toStringz;
+
+            string path = _path.expandTilde;  // keep var to avoid gc
+            stat_t statbuf = void;
+            return (() @trusted => stat(path.toStringz, &statbuf) == 0)();
+        }
         return std.file.exists(_path.expandTilde);
     }
 
@@ -446,6 +464,32 @@ version(Posix) {
             home_rel.join("test-file").exists.should.be(false);
             home_rel.join("test-file").writeFile("test");
             home_rel.join("test-file").exists.should.be(true);
+            home_rel.join("test-file").exists(true).should.be(true);
+        }
+    }
+
+    /// Check exists with followSymlink
+    unittest {
+        import dshould;
+        Path root = createTempPath();
+        scope(exit) root.remove();
+
+        root.join("file.txt").writeFile("hello");
+        root.join("dir").mkdir();
+
+        // Paths that are not symlinks give the same result in both modes
+        root.join("file.txt").exists(true).should.be(true);
+        root.join("dir").exists(true).should.be(true);
+        root.join("missing.txt").exists(true).should.be(false);
+
+        version(Posix) {
+            root.join("file.txt").symlink(root.join("link.txt"));
+            root.join("missing.txt").symlink(root.join("broken-link.txt"));
+
+            root.join("link.txt").exists(true).should.be(true);
+
+            root.join("broken-link.txt").exists.should.be(true);
+            root.join("broken-link.txt").exists(true).should.be(false);
         }
     }
 
@@ -1498,7 +1542,7 @@ version(Posix) {
       **/
     void copyFileTo(in Path dest, in bool rewrite=false) const {
         enforce!PathException(
-            this.exists,
+            this.exists(true),
             "Cannot Copy! Source file %s does not exists!".format(_path));
         if (dest.exists) {
             if (dest.isDir) {
@@ -1553,6 +1597,14 @@ version(Posix) {
         root.join("test-file.txt").copyFileTo(root.join("test-dst-dir")).should.throwA!PathException;
         root.join("test-file.txt").copyFileTo(root.join("test-dst-dir"), true);
         root.join("test-dst-dir", "test-file.txt").readFile.should.equal("test-42");
+
+        // Test copy of broken symlink
+        version(Posix) {
+            root.join("missing.txt").symlink(root.join("broken-link.txt"));
+            root.join("broken-link.txt").copyFileTo(
+                root.join("test-dst-dir", "broken-copy.txt")
+            ).should.throwA!PathException;
+        }
     }
 
     /** Copy file or directory to destination
@@ -2625,7 +2677,7 @@ version(Posix) {
         Path current_path = toAbsolute;
         while (!current_path.isRoot) {
             auto dst_path = current_path.join(search_path);
-            if (dst_path.exists && dst_path.isFile) {
+            if (dst_path.exists(true) && dst_path.isFile) {
                 return dst_path.nullable;
             }
             current_path = current_path.parent;
@@ -2699,6 +2751,16 @@ version(Posix) {
 
         import core.exception: AssertError;
         p5.get.should.throwA!AssertError;
+
+        // Broken symlink is skipped, and search continues in parent dirs
+        version(Posix) {
+            root.join("dir1", "dir2", "missing.conf").symlink(
+                root.join("dir1", "dir2", "my-conf.conf"));
+            auto p6 = root.join("dir1", "dir2", "dir3").searchFileUp(
+                "my-conf.conf");
+            p6.isNull.should.be(false);
+            p6.get.should.equal(root.join("dir1", "my-conf.conf"));
+        }
     }
 }
 
