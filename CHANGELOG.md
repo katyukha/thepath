@@ -1,5 +1,24 @@
 # Changelog
 
+## Release v2.4.0
+
+### New features
+
+- `Path.exists` got new argument `followSymlink`,
+   that will check if destination referenced by symlink exists.
+- `Path.isFile` and `Path.isDir` got new argument `followSymlink`
+  (default `true`). With `false`, a symlink is never reported as file or
+  directory, and a broken symlink does not raise an error.
+
+### Bug fixes
+
+- `Path.chown` with `followSymlink=false` changed owner of symlink targets,
+  including ones outside of the path being changed, and recursed into a
+  directory referenced by a symlink. Now it changes owner of symlinks
+  themselves (`lchown`) and does not descend into symlinked directories.
+
+---
+
 ## Release v2.3.0
 
 ### New features
